@@ -27,6 +27,18 @@ function formatTime(date: Date): string {
   });
 }
 
+function toTitleFromEnv(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "Project";
+
+  const normalized = trimmed
+    .replace(/[_-]+/g, " ")
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
 function LoadingState() {
   return (
     <div className="flex items-center justify-center h-full" style={{ color: "var(--plane-text-muted)" }}>
@@ -63,10 +75,7 @@ function ErrorState({ message }: { message: string }) {
 export function KanbanBoard() {
   const { groupedIssues, states, loading, error, lastUpdated } = usePlaneData();
 
-  const workspaceName =
-    import.meta.env.VITE_WORKSPACE_SLUG
-      ? `${import.meta.env.VITE_WORKSPACE_SLUG}`
-      : "Plane";
+  const projectName = toTitleFromEnv(import.meta.env.VITE_PROJECT_ID ?? "");
 
   const totalIssues =
     groupedIssues.todo.length +
@@ -100,20 +109,20 @@ export function KanbanBoard() {
               color: "#fff",
             }}
           >
-            P
+            {projectName.charAt(0)}
           </div>
           <div>
             <h1
               className="text-sm font-semibold leading-none"
               style={{ color: "var(--plane-text)" }}
             >
-              {workspaceName}
+              {projectName}
             </h1>
             <p
               className="text-xs mt-0.5"
               style={{ color: "var(--plane-text-muted)" }}
             >
-              {totalIssues} issues
+              {totalIssues} work items
             </p>
           </div>
         </div>

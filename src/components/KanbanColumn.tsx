@@ -76,7 +76,7 @@ export function KanbanColumn({
             }}
           >
             <span className="text-lg mb-1">✓</span>
-            <span className="text-xs">No issues</span>
+            <span className="text-xs">No work items</span>
           </div>
         ) : (
           issues.map((issue) => (

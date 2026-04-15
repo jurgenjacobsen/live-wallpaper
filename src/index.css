@@ -2,21 +2,21 @@
 
 @layer base {
   :root {
-    --plane-bg: #0d0e12;
-    --plane-surface: #13141a;
-    --plane-surface-2: #1c1d25;
-    --plane-border: #26272f;
-    --plane-text: #e2e4ea;
-    --plane-text-muted: #5c5e6e;
-    --plane-text-secondary: #8f91a2;
-    --plane-accent: #5b6af3;
+    --plane-bg: #f3f6fb;
+    --plane-surface: #ffffff;
+    --plane-surface-2: #f9fbff;
+    --plane-border: #d6deea;
+    --plane-text: #1f2937;
+    --plane-text-muted: #6b7280;
+    --plane-text-secondary: #4b5563;
+    --plane-accent: #2563eb;
 
     /* Priority colours */
     --priority-urgent: #ef4444;
     --priority-high: #f97316;
     --priority-medium: #eab308;
     --priority-low: #3b82f6;
-    --priority-none: #4b5563;
+    --priority-none: #64748b;
   }
 
   *, *::before, *::after {
