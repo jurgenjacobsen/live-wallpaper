@@ -5,13 +5,31 @@ import type {
   PlaneIssue,
   PlaneMember,
   PlaneCycle,
-  PaginatedResponse,
 } from "../types/plane";
 
-const BASE_URL = "https://api.plane.so";
+const BASE_URL = import.meta.env.DEV
+  ? "/plane-api"
+  : import.meta.env.VITE_PLANE_API_BASE_URL ?? "https://api.plane.so";
 
 function getApiKey(): string {
   return import.meta.env.VITE_PLANE_API_KEY ?? "";
+}
+
+function parseListResponse<T>(data: unknown, path: string): T[] {
+  if (Array.isArray(data)) {
+    return data as T[];
+  }
+
+  if (
+    typeof data === "object" &&
+    data !== null &&
+    "results" in data &&
+    Array.isArray((data as { results?: unknown }).results)
+  ) {
+    return (data as { results: T[] }).results;
+  }
+
+  throw new Error(`Plane API returned an unexpected list payload for ${path}`);
 }
 
 async function planeFetch<T>(path: string): Promise<T> {
@@ -35,37 +53,33 @@ async function planeFetch<T>(path: string): Promise<T> {
 }
 
 export async function fetchWorkspaces(): Promise<PlaneWorkspace[]> {
-  const data = await planeFetch<PaginatedResponse<PlaneWorkspace>>(
-    "/api/v1/workspaces/"
-  );
-  return data.results;
+  const path = "/api/v1/workspaces/";
+  const data = await planeFetch<unknown>(path);
+  return parseListResponse<PlaneWorkspace>(data, path);
 }
 
 export async function fetchProjects(workspaceSlug: string): Promise<PlaneProject[]> {
-  const data = await planeFetch<PaginatedResponse<PlaneProject>>(
-    `/api/v1/workspaces/${workspaceSlug}/projects/`
-  );
-  return data.results;
+  const path = `/api/v1/workspaces/${workspaceSlug}/projects/`;
+  const data = await planeFetch<unknown>(path);
+  return parseListResponse<PlaneProject>(data, path);
 }
 
 export async function fetchStates(
   workspaceSlug: string,
   projectId: string
 ): Promise<PlaneState[]> {
-  const data = await planeFetch<PaginatedResponse<PlaneState>>(
-    `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/states/`
-  );
-  return data.results;
+  const path = `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/states/`;
+  const data = await planeFetch<unknown>(path);
+  return parseListResponse<PlaneState>(data, path);
 }
 
 export async function fetchIssues(
   workspaceSlug: string,
   projectId: string
 ): Promise<PlaneIssue[]> {
-  const data = await planeFetch<PaginatedResponse<PlaneIssue>>(
-    `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/issues/?expand=state_detail,assignee_details,label_details`
-  );
-  return data.results;
+  const path = `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/issues/?expand=state_detail,assignee_details,label_details`;
+  const data = await planeFetch<unknown>(path);
+  return parseListResponse<PlaneIssue>(data, path);
 }
 
 export async function fetchCurrentUser(
@@ -80,10 +94,9 @@ export async function fetchActiveCycles(
   workspaceSlug: string,
   projectId: string
 ): Promise<PlaneCycle[]> {
-  const data = await planeFetch<PaginatedResponse<PlaneCycle>>(
-    `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/cycles/?cycle_view=current`
-  );
-  return data.results;
+  const path = `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/cycles/?cycle_view=current`;
+  const data = await planeFetch<unknown>(path);
+  return parseListResponse<PlaneCycle>(data, path);
 }
 
 export async function fetchCycleIssues(
@@ -91,8 +104,7 @@ export async function fetchCycleIssues(
   projectId: string,
   cycleId: string
 ): Promise<PlaneIssue[]> {
-  const data = await planeFetch<PaginatedResponse<PlaneIssue>>(
-    `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/cycles/${cycleId}/cycle-issues/?expand=state_detail,assignee_details,label_details`
-  );
-  return data.results;
+  const path = `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/cycles/${cycleId}/cycle-issues/?expand=state_detail,assignee_details,label_details`;
+  const data = await planeFetch<unknown>(path);
+  return parseListResponse<PlaneIssue>(data, path);
 }

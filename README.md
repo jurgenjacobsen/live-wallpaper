@@ -32,7 +32,7 @@ cp .env.example .env
 |----------|-------------|
 | `VITE_PLANE_API_KEY` | Your Plane.so API key (Profile → API Tokens) |
 | `VITE_WORKSPACE_SLUG` | Workspace slug from the URL, e.g. `my-team` |
-| `VITE_PROJECT_ID` | Project ID from Project Settings → General |
+| `VITE_PROJECT_ID` | Project selector: Project ID, identifier (e.g. `ARCHIVUM`), or project name |
 
 ### 3. Start the dev server
 

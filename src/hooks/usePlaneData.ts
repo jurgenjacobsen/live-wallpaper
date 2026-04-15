@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { GroupedIssues, PlaneIssue, PlaneState } from "../types/plane";
 import {
+  fetchProjects,
   fetchStates,
   fetchIssues,
   fetchCurrentUser,
@@ -15,6 +16,37 @@ interface UsePlaneDataReturn {
   error: string | null;
   lastUpdated: Date | null;
   refresh: () => void;
+}
+
+function previewList(values: string[]): string {
+  const unique = Array.from(new Set(values.filter(Boolean)));
+  const preview = unique.slice(0, 8);
+  return preview.join(", ") + (unique.length > preview.length ? ", ..." : "");
+}
+
+async function resolveProjectId(
+  workspaceSlug: string,
+  inputProject: string
+): Promise<string> {
+  const projects = await fetchProjects(workspaceSlug);
+  const normalized = inputProject.trim().toLowerCase();
+
+  const match = projects.find((p) => {
+    const byId = p.id.toLowerCase() === normalized;
+    const byIdentifier = p.identifier.toLowerCase() === normalized;
+    const byName = p.name.toLowerCase() === normalized;
+    return byId || byIdentifier || byName;
+  });
+
+  if (!match) {
+    throw new Error(
+      `Project \"${inputProject}\" not found in workspace \"${workspaceSlug}\". Available project identifiers: ${previewList(
+        projects.map((p) => p.identifier)
+      )}`
+    );
+  }
+
+  return match.id;
 }
 
 function groupIssuesByState(
@@ -80,10 +112,15 @@ export function usePlaneData(): UsePlaneDataReturn {
       setError(null);
 
       try {
+        const resolvedProjectId = await resolveProjectId(
+          workspaceSlug,
+          projectId
+        );
+
         const [fetchedStates, currentUser, activeCycles] = await Promise.all([
-          fetchStates(workspaceSlug, projectId),
+          fetchStates(workspaceSlug, resolvedProjectId),
           fetchCurrentUser(workspaceSlug).catch(() => null),
-          fetchActiveCycles(workspaceSlug, projectId).catch(() => []),
+          fetchActiveCycles(workspaceSlug, resolvedProjectId).catch(() => []),
         ]);
 
         if (cancelled) return;
@@ -96,9 +133,13 @@ export function usePlaneData(): UsePlaneDataReturn {
 
         if (activeCycle) {
           // Prefer cycle issues when there is an active cycle
-          issues = await fetchCycleIssues(workspaceSlug, projectId, activeCycle.id);
+          issues = await fetchCycleIssues(
+            workspaceSlug,
+            resolvedProjectId,
+            activeCycle.id
+          );
         } else {
-          issues = await fetchIssues(workspaceSlug, projectId);
+          issues = await fetchIssues(workspaceSlug, resolvedProjectId);
         }
 
         if (cancelled) return;
