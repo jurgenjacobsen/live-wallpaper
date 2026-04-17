@@ -1,198 +1,174 @@
 # live-wallpaper
 
-A dynamic desktop wallpaper system that renders a live Kanban board (powered by **Plane.so**) as your desktop background.
+Live Wallpaper is a Windows desktop app that turns your wallpaper into a live status board.
+
+It packages a React UI and a Go runtime into a single executable (`Live Wallpaper.exe`). The app serves the UI locally, captures it with headless Chrome, and applies it as wallpaper per monitor. It supports both Plane Kanban data and weather widgets, with monitor-level provider assignment.
+
+## What it does
+
+- Ships as a single Windows executable (no Node.js needed at runtime)
+- First-run setup form in your browser for local configuration
+- Per-monitor provider selection (`plane` or `weather`)
+- Scheduled refresh with configurable intervals
+- Tray controls for daily use and troubleshooting
+- Automatic update check on startup via GitHub Releases
+- Manual update check from the tray menu
+
+## Runtime behavior
+
+On startup, the app:
+1. Loads or creates `live-wallpaper-config.json` next to the executable
+2. Starts a local HTTP server for the embedded frontend
+3. Captures monitor-specific wallpaper images and applies them
+4. Runs recurring provider updates on configured intervals
+5. Writes logs to `live-wallpaper.log` next to the executable
+
+### Tray menu
+
+The tray icon currently provides:
+
+- Open settings
+- Open logs
+- Check for updates
+- Update wallpapers
+- Restart
+- Shutdown
 
 ## Architecture
 
 | Layer | Tech |
 |-------|------|
 | UI | React 19 + TypeScript + Tailwind CSS v4 via Vite |
-| Data | Plane.so REST API |
-| Capture | Go + chromedp (headless Chrome) |
-| Scheduling | Go `time.Ticker` (every 30 minutes) + tray "Update now" |
-| OS integration | Windows `SystemParametersInfoW` + `IDesktopWallpaper` (per-monitor optional) |
-
-The project ships as a single **`Live Wallpaper.exe`** that embeds the entire React frontend, serves it on a loopback port, screenshots it with headless Chrome, and sets the result as your Windows desktop background — all without Node.js at runtime.
-
-On first run, the app opens a local setup form in your browser where you enter:
-- Plane API key
-- Workspace slug
-- Project selector (project ID, identifier, or name)
-- Target monitor(s)
-
-Those values are stored in `live-wallpaper-config.json` next to the executable.
+| Runtime | Go |
+| Capture | chromedp (headless Chrome) |
+| Data providers | Plane REST API, Weather API |
+| Scheduling | Go `time.Ticker` |
+| Windows integration | systray + wallpaper APIs |
+| Update checks | GitHub Releases API |
 
 ## Repository structure
 
 ```
 .
-├─ go/                 # Go runtime, tray integration, wallpaper capture, embedded frontend
-│  ├─ assets/          # Go runtime icon assets
-│  └─ dist/            # Vite production output embedded by Go
-├─ src/                # React app source
-├─ scripts/            # Optional Node-based local development utilities
-├─ public/             # Static web assets (favicon, etc.)
-├─ build.bat           # Windows production build script
-└─ Makefile            # Optional build helpers
+├─ go/                     # Go runtime and main application module
+│  ├─ assets/              # Runtime icon source
+│  └─ dist/                # Embedded frontend build output
+├─ src/                    # React app source
+├─ public/                 # Static frontend assets
+├─ scripts/                # Optional Node development utilities
+├─ installer/              # Inno Setup script and installer output
+├─ build.bat               # Build Live Wallpaper.exe
+├─ build-installer.bat     # Build installer .exe
+└─ Makefile                # Optional cross-platform build helpers
 ```
 
 ---
 
-## Building the .exe (Windows)
+## Build `Live Wallpaper.exe`
 
 ### Prerequisites
 
 | Tool | Where to get it |
 |------|-----------------|
-| Node.js ≥ 18 | <https://nodejs.org> |
-| Go ≥ 1.22 | <https://go.dev/dl/> |
-| Google Chrome | <https://www.google.com/chrome/> |
+| Node.js >= 18 | https://nodejs.org |
+| Go >= 1.22 | https://go.dev/dl/ |
+| Google Chrome | https://www.google.com/chrome/ |
 
-> Chrome is needed at **runtime** (headless) — it does not need to be installed on the build machine for cross-compilation.
+Chrome is required at runtime for headless capture.
 
-### 1. Install Node dependencies
+### Build commands
 
-```bash
-npm install
-```
-
-### 2. Build
-
-**Windows (Command Prompt / PowerShell):**
+Windows:
 
 ```cmd
 build.bat
 ```
 
-**Linux / macOS (cross-compile for Windows):**
+Or from npm:
+
+```bash
+npm run build:exe
+```
+
+Linux/macOS cross-compile helper:
 
 ```bash
 make build-windows
 ```
 
-Both commands:
-1. Run `npm run build` to compile the React app into `go/dist/`
-2. Run `go build` in `go/` to embed `go/dist/` into a single Windows `.exe`
+Output:
 
-The output is **`Live Wallpaper.exe`** (~15 MB).
+- `Live Wallpaper.exe` in repository root
 
-### 3. Deploy
+## Build installer (`.exe`)
 
-Copy **`Live Wallpaper.exe`** to any folder and run it. On first launch it opens a setup form where you provide your Plane/workspace/project and monitor preferences.
+The project includes an Inno Setup installer with:
 
-After setup, it will:
-- Set the wallpaper immediately
-- Refresh every **30 minutes**
-- Let you reopen setup from tray via **Open settings**
-- Show a system tray icon with **Open logs**, **Update now**, **Restart**, and **Shutdown**
-- Write logs to `live-wallpaper.log` in the same folder
-
-The app favicon is sourced from `public/icon.png`.
-The tray icon, executable icon, and Windows metadata are sourced from `go/assets/icon.png` during build.
-
-### 4. Run on Windows startup
-
-**Option A – Startup folder (simplest)**
-
-1. Press `Win + R`, type `shell:startup`, press Enter
-2. Copy `Live Wallpaper.exe` into that folder
-
-**Option B – Task Scheduler (recommended)**
-
-1. Open *Task Scheduler* → *Create Basic Task*
-2. Trigger: **At log on**
-3. Action: **Start a program** → browse to `Live Wallpaper.exe`
-4. Set *Start in* to the folder containing `Live Wallpaper.exe`
-5. Under *Properties → General*: tick **Run whether user is logged on or not** if desired
-
-### 5. Build a Windows installer (.exe)
-
-This repository includes an Inno Setup installer that supports:
-- Choosing the installation directory
-- Optional desktop shortcut creation
-- Start Menu shortcut creation
-
-Installer files:
-- `installer/LiveWallpaper.iss`
-- `build-installer.bat`
+- User-selectable install location
+- Optional desktop shortcut
+- Start Menu shortcut
+- Versioned installer output filename
 
 Prerequisite:
-- Install Inno Setup 6: <https://jrsoftware.org/isinfo.php>
 
-Build steps:
+- Inno Setup 6 (`ISCC`): https://jrsoftware.org/isinfo.php
+
+Commands:
 
 ```cmd
 build.bat
 build-installer.bat
 ```
 
-Or via npm:
+Or from npm:
 
 ```bash
 npm run build:exe
 npm run build:installer
 ```
 
-Installer output:
+Output:
+
 - `installer/dist/LiveWallpaper-Setup-<version>.exe`
 
-Note:
-- The installer defaults to `%LOCALAPPDATA%\Live Wallpaper` so the app can write `live-wallpaper-config.json` and logs without admin permissions.
+Notes:
 
----
+- Installer defaults to `%LOCALAPPDATA%\Live Wallpaper`
+- This avoids admin requirements and keeps config/logs writable
 
-## Development workflow (Node.js, no build required)
+## Update delivery model
 
-### Start the dev server
+- App checks latest GitHub release once at startup
+- User can manually trigger check via tray (`Check for updates`)
+- If a newer version exists, the app prompts to open the release page
+- Recommended release process: publish a new installer for each version
+
+## Development workflow (frontend/util scripts)
+
+For frontend-only iteration:
 
 ```bash
+npm install
 npm run dev
 ```
 
-The React app will be available at `http://localhost:5173`.
-
-### Capture the wallpaper once
+Optional Node capture scripts:
 
 ```bash
 npm run wallpaper
-```
-
-### Run on a schedule (every 30 minutes)
-
-```bash
 npm run schedule
 ```
 
-Keep this running alongside `npm run dev`.
+These scripts are convenience tools for local development. Production runtime uses the Go app.
 
-## Layout
+## Plane board mapping
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  200 px spacer    │              Kanban Board (1720 px)           │
-│  (desktop icons)  │  ┌─────────┐  ┌────────────┐  ┌──────────┐  │
-│                   │  │  Todo   │  │ In Progress│  │   Done   │  │
-│                   │  └─────────┘  └────────────┘  └──────────┘  │
-└──────────────────────────────────────────────────────────────────┘
-                               1920 × 1080 px
-```
+Issue columns are grouped as:
 
-## Issue grouping
+| Column | Plane states |
+|--------|---------------|
+| Todo | `backlog`, `unstarted`, `cancelled` |
+| In Progress | `started` |
+| Done | `completed` |
 
-| Column | Plane state groups |
-|--------|--------------------|
-| **Todo** | `backlog`, `unstarted`, `cancelled` |
-| **In Progress** | `started` |
-| **Done** | `completed` |
-
-Issues are filtered to those **assigned to the current user**. When an active cycle exists, only cycle issues are shown.
-
-## Priority colours
-
-| Priority | Colour |
-|----------|--------|
-| 🔴 Urgent | `#ef4444` |
-| 🟠 High | `#f97316` |
-| 🟡 Medium | `#eab308` |
-| 🔵 Low | `#3b82f6` |
-| ⚪ None | `#4b5563` |
+Issues are filtered to the current user, and to active cycle issues when a cycle exists.
