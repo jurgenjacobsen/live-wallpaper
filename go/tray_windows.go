@@ -23,7 +23,7 @@ func supportsTray() bool {
 }
 
 func runTray(callbacks trayCallbacks) error {
-	if callbacks.OpenSettings == nil || callbacks.OpenLogs == nil || callbacks.UpdateNow == nil || callbacks.Restart == nil || callbacks.Shutdown == nil {
+	if callbacks.OpenSettings == nil || callbacks.OpenLogs == nil || callbacks.CheckUpdates == nil || callbacks.UpdateNow == nil || callbacks.Restart == nil || callbacks.Shutdown == nil {
 		return fmt.Errorf("tray callbacks must be provided")
 	}
 
@@ -40,8 +40,9 @@ func runTray(callbacks trayCallbacks) error {
 
 		openSettings := systray.AddMenuItem("Open settings", "Open the setup/settings page")
 		openLogs := systray.AddMenuItem("Open logs", "Open the log file")
+		checkUpdates := systray.AddMenuItem("Check for updates", "Check GitHub Releases for a newer version")
 		systray.AddSeparator()
-		updateNow := systray.AddMenuItem("Update now", "Capture and apply wallpaper immediately")
+		updateNow := systray.AddMenuItem("Update wallpapers", "Capture and apply wallpaper immediately")
 		restart := systray.AddMenuItem("Restart", "Restart Live Wallpaper")
 		systray.AddSeparator()
 		shutdown := systray.AddMenuItem("Shutdown", "Stop Live Wallpaper")
@@ -53,6 +54,8 @@ func runTray(callbacks trayCallbacks) error {
 					callbacks.OpenSettings()
 				case <-openLogs.ClickedCh:
 					callbacks.OpenLogs()
+				case <-checkUpdates.ClickedCh:
+					callbacks.CheckUpdates()
 				case <-updateNow.ClickedCh:
 					callbacks.UpdateNow()
 				case <-restart.ClickedCh:

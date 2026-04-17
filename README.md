@@ -105,6 +105,40 @@ The tray icon, executable icon, and Windows metadata are sourced from `go/assets
 4. Set *Start in* to the folder containing `Live Wallpaper.exe`
 5. Under *Properties → General*: tick **Run whether user is logged on or not** if desired
 
+### 5. Build a Windows installer (.exe)
+
+This repository includes an Inno Setup installer that supports:
+- Choosing the installation directory
+- Optional desktop shortcut creation
+- Start Menu shortcut creation
+
+Installer files:
+- `installer/LiveWallpaper.iss`
+- `build-installer.bat`
+
+Prerequisite:
+- Install Inno Setup 6: <https://jrsoftware.org/isinfo.php>
+
+Build steps:
+
+```cmd
+build.bat
+build-installer.bat
+```
+
+Or via npm:
+
+```bash
+npm run build:exe
+npm run build:installer
+```
+
+Installer output:
+- `installer/dist/LiveWallpaper-Setup-<version>.exe`
+
+Note:
+- The installer defaults to `%LOCALAPPDATA%\Live Wallpaper` so the app can write `live-wallpaper-config.json` and logs without admin permissions.
+
 ---
 
 ## Development workflow (Node.js, no build required)

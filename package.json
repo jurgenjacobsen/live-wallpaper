@@ -1,11 +1,12 @@
 {
   "name": "live-wallpaper",
-  "private": true,
   "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:exe": "build.bat",
+    "build:installer": "build-installer.bat",
     "lint": "eslint .",
     "preview": "vite preview",
     "wallpaper": "tsx scripts/update-wallpaper.ts",
@@ -36,5 +37,8 @@
     "vite": "^8.0.4",
     "tailwindcss": "^4.2.2",
     "@tailwindcss/vite": "^4.2.2"
+  },
+  "repository": {
+    "url": "https://github.com/jurgenjacobsen/live-wallpaper"
   }
 }

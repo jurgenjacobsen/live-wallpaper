@@ -42,6 +42,41 @@ func main() {
 	log.Printf("[live-wallpaper] plane interval: every %d minute(s)", cfg.PlaneUpdateIntervalMinutes)
 	log.Printf("[live-wallpaper] weather interval: every %d minute(s)", cfg.WeatherUpdateIntervalMinutes)
 
+	checkForUpdates := func(trigger string) {
+		updateCtx, updateCancel := context.WithTimeout(context.Background(), 8*time.Second)
+		defer updateCancel()
+
+		latestVersion, releaseURL, updateAvailable, updateErr := checkForGithubReleaseUpdate(updateCtx, appVersion)
+		if updateErr != nil {
+			log.Printf("[live-wallpaper] update check skipped (%s): %v", trigger, updateErr)
+			return
+		}
+		if !updateAvailable {
+			log.Printf("[live-wallpaper] no update available (%s): current=%s", trigger, appVersion)
+			return
+		}
+
+		log.Printf("[live-wallpaper] update available (%s): current=%s latest=%s", trigger, appVersion, latestVersion)
+
+		openReleasePage, promptErr := promptUpdateAvailable(appVersion, latestVersion)
+		if promptErr != nil {
+			log.Printf("[live-wallpaper] update prompt failed (%s): %v", trigger, promptErr)
+			return
+		}
+		if !openReleasePage {
+			log.Printf("[live-wallpaper] update prompt dismissed (%s)", trigger)
+			return
+		}
+
+		if err := openBrowser(releaseURL); err != nil {
+			log.Printf("[live-wallpaper] open release page failed (%s): %v", trigger, err)
+		}
+	}
+
+	go func() {
+		checkForUpdates("startup")
+	}()
+
 	// Start the embedded HTTP server on a random loopback port.
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -227,6 +262,9 @@ func main() {
 						log.Printf("[live-wallpaper] open logs failed: %v", err)
 					}
 				}()
+			},
+			CheckUpdates: func() {
+				go checkForUpdates("tray menu: check for updates")
 			},
 			UpdateNow: func() {
 				setTrayTooltip(trayUpdatingTooltip)

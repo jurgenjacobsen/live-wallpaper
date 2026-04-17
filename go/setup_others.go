@@ -30,3 +30,7 @@ func openLogFile(path string) error {
 	}
 	return fmt.Errorf("could not open log file automatically")
 }
+
+func promptUpdateAvailable(_ string, _ string) (bool, error) {
+	return false, nil
+}
