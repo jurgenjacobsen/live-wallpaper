@@ -8,33 +8,108 @@ A dynamic desktop wallpaper system that renders a live Kanban board (powered by 
 |-------|------|
 | UI | React 19 + TypeScript + Tailwind CSS v4 via Vite |
 | Data | Plane.so REST API |
-| Capture | Node.js + Puppeteer (headless Chromium) |
-| Scheduling | node-cron (every 30 minutes) |
-| OS integration | `wallpaper` npm package |
+| Capture | Go + chromedp (headless Chrome) |
+| Scheduling | Go `time.Ticker` (every 30 minutes) + tray "Update now" |
+| OS integration | Windows `SystemParametersInfoW` + `IDesktopWallpaper` (per-monitor optional) |
 
-## Quick Start
+The project ships as a single **`Live Wallpaper.exe`** that embeds the entire React frontend, serves it on a loopback port, screenshots it with headless Chrome, and sets the result as your Windows desktop background — all without Node.js at runtime.
 
-### 1. Install dependencies
+On first run, the app opens a local setup form in your browser where you enter:
+- Plane API key
+- Workspace slug
+- Project selector (project ID, identifier, or name)
+- Target monitor(s)
+
+Those values are stored in `live-wallpaper-config.json` next to the executable.
+
+## Repository structure
+
+```
+.
+├─ go/                 # Go runtime, tray integration, wallpaper capture, embedded frontend
+│  ├─ assets/          # Go runtime icon assets
+│  └─ dist/            # Vite production output embedded by Go
+├─ src/                # React app source
+├─ scripts/            # Optional Node-based local development utilities
+├─ public/             # Static web assets (favicon, etc.)
+├─ build.bat           # Windows production build script
+└─ Makefile            # Optional build helpers
+```
+
+---
+
+## Building the .exe (Windows)
+
+### Prerequisites
+
+| Tool | Where to get it |
+|------|-----------------|
+| Node.js ≥ 18 | <https://nodejs.org> |
+| Go ≥ 1.22 | <https://go.dev/dl/> |
+| Google Chrome | <https://www.google.com/chrome/> |
+
+> Chrome is needed at **runtime** (headless) — it does not need to be installed on the build machine for cross-compilation.
+
+### 1. Install Node dependencies
 
 ```bash
 npm install
 ```
 
-### 2. Configure environment
+### 2. Build
 
-Copy `.env.example` to `.env` and fill in your credentials:
+**Windows (Command Prompt / PowerShell):**
 
-```bash
-cp .env.example .env
+```cmd
+build.bat
 ```
 
-| Variable | Description |
-|----------|-------------|
-| `VITE_PLANE_API_KEY` | Your Plane.so API key (Profile → API Tokens) |
-| `VITE_WORKSPACE_SLUG` | Workspace slug from the URL, e.g. `my-team` |
-| `VITE_PROJECT_ID` | Project selector: Project ID, identifier (e.g. `ARCHIVUM`), or project name |
+**Linux / macOS (cross-compile for Windows):**
 
-### 3. Start the dev server
+```bash
+make build-windows
+```
+
+Both commands:
+1. Run `npm run build` to compile the React app into `go/dist/`
+2. Run `go build` in `go/` to embed `go/dist/` into a single Windows `.exe`
+
+The output is **`Live Wallpaper.exe`** (~15 MB).
+
+### 3. Deploy
+
+Copy **`Live Wallpaper.exe`** to any folder and run it. On first launch it opens a setup form where you provide your Plane/workspace/project and monitor preferences.
+
+After setup, it will:
+- Set the wallpaper immediately
+- Refresh every **30 minutes**
+- Let you reopen setup from tray via **Open settings**
+- Show a system tray icon with **Open logs**, **Update now**, **Restart**, and **Shutdown**
+- Write logs to `live-wallpaper.log` in the same folder
+
+The app favicon is sourced from `public/icon.png`.
+The tray icon, executable icon, and Windows metadata are sourced from `go/assets/icon.png` during build.
+
+### 4. Run on Windows startup
+
+**Option A – Startup folder (simplest)**
+
+1. Press `Win + R`, type `shell:startup`, press Enter
+2. Copy `Live Wallpaper.exe` into that folder
+
+**Option B – Task Scheduler (recommended)**
+
+1. Open *Task Scheduler* → *Create Basic Task*
+2. Trigger: **At log on**
+3. Action: **Start a program** → browse to `Live Wallpaper.exe`
+4. Set *Start in* to the folder containing `Live Wallpaper.exe`
+5. Under *Properties → General*: tick **Run whether user is logged on or not** if desired
+
+---
+
+## Development workflow (Node.js, no build required)
+
+### Start the dev server
 
 ```bash
 npm run dev
@@ -42,21 +117,19 @@ npm run dev
 
 The React app will be available at `http://localhost:5173`.
 
-### 4. Capture the wallpaper once
+### Capture the wallpaper once
 
 ```bash
 npm run wallpaper
 ```
 
-This launches headless Chromium, navigates to `http://localhost:5173`, takes a 1920×1080 screenshot saved as `wallpaper.png`, and sets it as your desktop background.
-
-### 5. Run on a schedule (every 30 minutes)
+### Run on a schedule (every 30 minutes)
 
 ```bash
 npm run schedule
 ```
 
-Keep this running alongside `npm run dev`. It updates the wallpaper immediately on startup and then every 30 minutes via cron.
+Keep this running alongside `npm run dev`.
 
 ## Layout
 

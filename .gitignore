@@ -8,7 +8,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
+go/dist/*
+!go/dist/.gitkeep
 dist-ssr
 *.local
 
@@ -27,6 +28,18 @@ dist-ssr
 .env
 .env.*
 !.env.example
+live-wallpaper-config.json
 
 # Generated wallpaper screenshot
 wallpaper.png
+
+# Go build output
+live-wallpaper.exe
+Live Wallpaper.exe
+live-wallpaper
+go/rsrc.syso
+go/rsrc_windows_amd64.syso
+go/rsrc_windows_386.syso
+
+weather-background.*
+*.exe
