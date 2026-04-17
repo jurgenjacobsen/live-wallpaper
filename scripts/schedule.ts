@@ -39,7 +39,7 @@ const task = cron.schedule("*/30 * * * *", () => {
   void runUpdate();
 });
 
-console.log("[scheduler] Wallpaper scheduler started – updates every 30 minutes.");
+console.log("[scheduler] Wallpaper scheduler started - updates every 30 minutes.");
 console.log("[scheduler] Press Ctrl+C to stop.");
 
 process.on("SIGINT", () => {
