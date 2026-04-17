@@ -7,12 +7,61 @@ import type {
   PlaneCycle,
 } from "../types/plane";
 
-const BASE_URL = import.meta.env.DEV
-  ? "/plane-api"
-  : import.meta.env.VITE_PLANE_API_BASE_URL ?? "https://api.plane.so";
+const BASE_URL = "/plane-api";
 
-function getApiKey(): string {
-  return import.meta.env.VITE_PLANE_API_KEY ?? "";
+export type RuntimeProvider = "plane" | "weather";
+export type WeatherCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+export interface RuntimeConfig {
+  selectedProvider: RuntimeProvider;
+  monitorIndex: number;
+  plane: {
+    apiKey: string;
+    workspaceSlug: string;
+    projectId: string;
+  };
+  weather: {
+    city: string;
+    corner: WeatherCorner;
+    backgroundImageUrl: string;
+  };
+}
+
+let runtimeConfigPromise: Promise<RuntimeConfig> | null = null;
+
+export async function getRuntimeConfig(): Promise<RuntimeConfig> {
+  if (runtimeConfigPromise) {
+    return runtimeConfigPromise;
+  }
+
+  runtimeConfigPromise = (async () => {
+    const params = new URLSearchParams(window.location.search);
+    const pathname = window.location.pathname.toLowerCase();
+
+    if (!params.has("provider")) {
+      if (pathname.startsWith("/weather")) {
+        params.set("provider", "weather");
+      } else if (pathname.startsWith("/plane")) {
+        params.set("provider", "plane");
+      }
+    }
+
+    const query = params.toString();
+    const runtimeConfigUrl = query ? `/api/runtime-config?${query}` : "/api/runtime-config";
+
+    const res = await fetch(runtimeConfigUrl, { cache: "no-store" });
+    if (!res.ok) {
+      throw new Error("runtime config is not available");
+    }
+
+    const data = (await res.json()) as RuntimeConfig;
+    if (!data.selectedProvider || !data.plane || !data.weather) {
+      throw new Error("runtime config is incomplete");
+    }
+    return data;
+  })();
+
+  return runtimeConfigPromise;
 }
 
 function parseListResponse<T>(data: unknown, path: string): T[] {
@@ -33,9 +82,10 @@ function parseListResponse<T>(data: unknown, path: string): T[] {
 }
 
 async function planeFetch<T>(path: string): Promise<T> {
-  const apiKey = getApiKey();
+  const cfg = await getRuntimeConfig();
+  const apiKey = cfg.plane.apiKey;
   if (!apiKey) {
-    throw new Error("VITE_PLANE_API_KEY is not set");
+    throw new Error("Plane API key is not configured");
   }
 
   const res = await fetch(`${BASE_URL}${path}`, {
