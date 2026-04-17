@@ -43,4 +43,5 @@ go/rsrc_windows_386.syso
 
 weather-background.*
 *.exe
-*.[png|jpg|jpeg|bmp|gif]
+*.png
+*.jpg
