@@ -1,4 +1,7 @@
 import './index.css'
+import { useEffect, useState } from 'react'
+import { getRuntimeConfig, type RuntimeConfig } from './api/plane'
+import { WeatherWallpaper } from './components/WeatherWallpaper'
 import { KanbanBoard } from './components/KanbanBoard'
 
 /**
@@ -9,6 +12,55 @@ import { KanbanBoard } from './components/KanbanBoard'
  *   [KanbanBoard – fills the remaining 1720 px]
  */
 function App() {
+  const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const config = await getRuntimeConfig()
+        if (!cancelled) {
+          setRuntimeConfig(config)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err))
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+
+    void load()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  if (loading) {
+    return <div style={{ width: '1920px', height: '1080px', display: 'grid', placeItems: 'center' }}>Loading…</div>
+  }
+
+  if (error) {
+    return (
+      <div style={{ width: '1920px', height: '1080px', display: 'grid', placeItems: 'center', color: '#ef4444' }}>
+        {error}
+      </div>
+    )
+  }
+
+  if (runtimeConfig?.selectedProvider === 'weather') {
+    return <WeatherWallpaper runtimeConfig={runtimeConfig} />
+  }
+
   return (
     <div
       style={{

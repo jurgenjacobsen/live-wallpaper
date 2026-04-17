@@ -7,6 +7,7 @@ import {
   fetchCurrentUser,
   fetchActiveCycles,
   fetchCycleIssues,
+  getRuntimeConfig,
 } from "../api/plane";
 
 interface UsePlaneDataReturn {
@@ -80,9 +81,6 @@ function groupIssuesByState(
 }
 
 export function usePlaneData(): UsePlaneDataReturn {
-  const workspaceSlug = import.meta.env.VITE_WORKSPACE_SLUG ?? "";
-  const projectId = import.meta.env.VITE_PROJECT_ID ?? "";
-
   const [groupedIssues, setGroupedIssues] = useState<GroupedIssues>({
     todo: [],
     inProgress: [],
@@ -99,12 +97,6 @@ export function usePlaneData(): UsePlaneDataReturn {
   }, []);
 
   useEffect(() => {
-    if (!workspaceSlug || !projectId) {
-      setError("VITE_WORKSPACE_SLUG and VITE_PROJECT_ID must be set in .env");
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
 
     async function load() {
@@ -112,6 +104,10 @@ export function usePlaneData(): UsePlaneDataReturn {
       setError(null);
 
       try {
+        const runtimeConfig = await getRuntimeConfig();
+        const workspaceSlug = runtimeConfig.plane.workspaceSlug;
+        const projectId = runtimeConfig.plane.projectId;
+
         const resolvedProjectId = await resolveProjectId(
           workspaceSlug,
           projectId
@@ -166,7 +162,7 @@ export function usePlaneData(): UsePlaneDataReturn {
     return () => {
       cancelled = true;
     };
-  }, [workspaceSlug, projectId, tick]);
+  }, [tick]);
 
   return { groupedIssues, states, loading, error, lastUpdated, refresh };
 }
