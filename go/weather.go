@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
@@ -67,6 +68,16 @@ type dayAggregate struct {
 	Date        time.Time
 	MinC        int
 	MaxC        int
+	SampleCount int
+	TempTotal   float64
+	Reports     []dayReport
+	Condition   string
+	Description string
+	IconURL     string
+}
+
+type dayReport struct {
+	TempC       float64
 	Condition   string
 	Description string
 	IconURL     string
@@ -118,7 +129,7 @@ func fetchWeatherForecast(ctx context.Context, apiKey, city string) (weatherFore
 		WindKph:     rounded(nowEntry.Wind.Speed * 3.6),
 	}
 
-	aggregates := make(map[string]dayAggregate)
+	aggregates := make(map[string]*dayAggregate)
 	dateOrder := make([]string, 0, 8)
 	for _, entry := range payload.List {
 		parsed, err := time.Parse("2006-01-02 15:04:05", entry.DTText)
@@ -131,16 +142,19 @@ func fetchWeatherForecast(ctx context.Context, apiKey, city string) (weatherFore
 		maxC := rounded(entry.Main.TempMax)
 		agg, exists := aggregates[dateKey]
 		if !exists {
-			aggregates[dateKey] = dayAggregate{
+			agg = &dayAggregate{
 				Date:        parsed,
 				MinC:        minC,
 				MaxC:        maxC,
+				SampleCount: 0,
+				TempTotal:   0,
+				Reports:     make([]dayReport, 0, 8),
 				Condition:   weatherMain(entry),
 				Description: weatherDescription(entry),
 				IconURL:     weatherIconURL(entry),
 			}
+			aggregates[dateKey] = agg
 			dateOrder = append(dateOrder, dateKey)
-			continue
 		}
 
 		if minC < agg.MinC {
@@ -149,13 +163,42 @@ func fetchWeatherForecast(ctx context.Context, apiKey, city string) (weatherFore
 		if maxC > agg.MaxC {
 			agg.MaxC = maxC
 		}
-		aggregates[dateKey] = agg
+
+		reportMain := weatherMain(entry)
+		reportDescription := weatherDescription(entry)
+		reportIconURL := weatherIconURL(entry)
+		agg.TempTotal += entry.Main.Temp
+		agg.SampleCount++
+		agg.Reports = append(agg.Reports, dayReport{
+			TempC:       entry.Main.Temp,
+			Condition:   reportMain,
+			Description: reportDescription,
+			IconURL:     reportIconURL,
+		})
 	}
 
 	sort.Strings(dateOrder)
 	days := make([]weatherDayColumn, 0, 5)
 	for _, dateKey := range dateOrder {
 		agg := aggregates[dateKey]
+		if agg == nil {
+			continue
+		}
+
+		if agg.SampleCount > 0 && len(agg.Reports) > 0 {
+			avgTemp := agg.TempTotal / float64(agg.SampleCount)
+			bestDiff := math.MaxFloat64
+			for _, report := range agg.Reports {
+				diff := math.Abs(report.TempC - avgTemp)
+				if diff < bestDiff {
+					bestDiff = diff
+					agg.Condition = report.Condition
+					agg.Description = report.Description
+					agg.IconURL = report.IconURL
+				}
+			}
+		}
+
 		days = append(days, weatherDayColumn{
 			DateKey:     dateKey,
 			DateLabel:   agg.Date.Format("Mon 02 Jan"),
