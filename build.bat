@@ -22,7 +22,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [build] Building Go executable...
-go build -ldflags="-H windowsgui" -o "..\Live Wallpaper.exe" .
+go build -ldflags="-H windowsgui -X main.appVersion=%APP_VERSION%" -o "..\Live Wallpaper.exe" .
 if %ERRORLEVEL% NEQ 0 (
     popd
     echo [build] ERROR: go build failed.

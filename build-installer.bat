@@ -1,10 +1,11 @@
 @echo off
 setlocal
 
-if not exist "Live Wallpaper.exe" (
-    echo [installer] Live Wallpaper.exe not found in repository root.
-    echo [installer] Run build.bat first.
-    exit /b 1
+echo [installer] Building executable before packaging installer...
+call build.bat
+if %ERRORLEVEL% NEQ 0 (
+    echo [installer] ERROR: executable build failed.
+    exit /b %ERRORLEVEL%
 )
 
 for /f "usebackq delims=" %%v in (`node -p "require('./package.json').version"`) do set APP_VERSION=%%v
