@@ -147,8 +147,15 @@ func main() {
 				continue
 			}
 
+			width, height, sizeErr := monitorSize(assignment.MonitorIndex)
+			if sizeErr != nil {
+				log.Printf("[live-wallpaper] monitor size lookup failed for monitor %d, using fallback 1920x1080: %v", assignment.MonitorIndex, sizeErr)
+				width = 1920
+				height = 1080
+			}
+
 			wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d-%s.png", assignment.MonitorIndex, assignment.Provider))
-			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex); captureErr != nil {
+			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height); captureErr != nil {
 				if ctx.Err() != nil {
 					log.Printf("[live-wallpaper] update canceled during shutdown")
 					return
@@ -181,8 +188,15 @@ func main() {
 				continue
 			}
 
+			width, height, sizeErr := monitorSize(assignment.MonitorIndex)
+			if sizeErr != nil {
+				log.Printf("[live-wallpaper] monitor size lookup failed for monitor %d, using fallback 1920x1080: %v", assignment.MonitorIndex, sizeErr)
+				width = 1920
+				height = 1080
+			}
+
 			wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d-%s.png", assignment.MonitorIndex, assignment.Provider))
-			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex); captureErr != nil {
+			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height); captureErr != nil {
 				if ctx.Err() != nil {
 					log.Printf("[live-wallpaper] update canceled during shutdown")
 					return

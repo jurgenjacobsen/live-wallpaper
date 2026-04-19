@@ -6,6 +6,7 @@ require (
 	github.com/Kodeworks/golang-image-ico v0.0.0-20141118225523-73f0f4cfade9
 	github.com/chromedp/chromedp v0.15.1
 	github.com/getlantern/systray v1.2.2
+	golang.org/x/image v0.32.0
 )
 
 require (

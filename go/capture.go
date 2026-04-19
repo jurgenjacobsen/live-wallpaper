@@ -11,9 +11,13 @@ import (
 )
 
 // captureWallpaper launches headless Chrome, navigates to url, waits for the
-// React app to finish rendering (fonts + data), takes a 1920×1080 screenshot,
-// and saves the PNG to outputPath.
-func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider wallpaperProvider, monitorIndex int) error {
+// React app to finish rendering (fonts + data), takes a screenshot using the
+// monitor's resolution, and saves the PNG to outputPath.
+func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider wallpaperProvider, monitorIndex int, width int, height int) error {
+	if width < 1 || height < 1 {
+		return fmt.Errorf("invalid capture size %dx%d", width, height)
+	}
+
 	renderURL, err := url.Parse(pageURL)
 	if err != nil {
 		return fmt.Errorf("invalid page url: %w", err)
@@ -35,7 +39,7 @@ func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider 
 
 	// Build exec-allocator options on top of the sensible defaults.
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.WindowSize(1920, 1080),
+		chromedp.WindowSize(width, height),
 	)
 
 	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)
@@ -49,8 +53,8 @@ func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider 
 
 	var buf []byte
 	if err := chromedp.Run(timeoutCtx,
-		// Pin viewport to exactly 1920×1080 at 1× DPI.
-		chromedp.EmulateViewport(1920, 1080),
+		// Pin viewport to the monitor dimensions at 1x DPI.
+		chromedp.EmulateViewport(int64(width), int64(height)),
 		chromedp.Navigate(renderURL.String()),
 		// Wait for the DOM to be ready.
 		chromedp.WaitVisible("body", chromedp.ByQuery),

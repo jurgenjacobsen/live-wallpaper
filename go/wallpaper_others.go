@@ -12,3 +12,7 @@ func setWallpaper(_ string, _ []int) error {
 func listMonitorIndexes() ([]int, error) {
 	return []int{0}, nil
 }
+
+func monitorSize(_ int) (int, int, error) {
+	return 1920, 1080, nil
+}

@@ -5,11 +5,7 @@ import { WeatherWallpaper } from './components/WeatherWallpaper'
 import { KanbanBoard } from './components/KanbanBoard'
 
 /**
- * Root application layout for the 1920×1080 live wallpaper.
- *
- * Layout:
- *   [Spacer – 200 px wide, reserved for desktop icons on the left]
- *   [KanbanBoard – fills the remaining 1720 px]
+ * Root application layout for a monitor-sized wallpaper viewport.
  */
 function App() {
   const [runtimeConfig, setRuntimeConfig] = useState<RuntimeConfig | null>(null)
@@ -46,12 +42,12 @@ function App() {
   }, [])
 
   if (loading) {
-    return <div style={{ width: '1920px', height: '1080px', display: 'grid', placeItems: 'center' }}>Loading…</div>
+    return <div style={{ width: '100vw', height: '100vh', display: 'grid', placeItems: 'center' }}>Loading…</div>
   }
 
   if (error) {
     return (
-      <div style={{ width: '1920px', height: '1080px', display: 'grid', placeItems: 'center', color: '#ef4444' }}>
+      <div style={{ width: '100vw', height: '100vh', display: 'grid', placeItems: 'center', color: '#ef4444' }}>
         {error}
       </div>
     )
@@ -65,8 +61,8 @@ function App() {
     return (
       <div
         style={{
-          width: '1920px',
-          height: '1080px',
+          width: '100vw',
+          height: '100vh',
           background: 'linear-gradient(135deg, #0b1220, #111827)',
         }}
       />
@@ -77,8 +73,8 @@ function App() {
     <div
       style={{
         display: 'flex',
-        width: '1920px',
-        height: '1080px',
+        width: '100vw',
+        height: '100vh',
         overflow: 'hidden',
         backgroundColor: 'var(--plane-bg)',
       }}
@@ -86,15 +82,15 @@ function App() {
       {/* Left spacer: reserved for desktop icons */}
       <div
         style={{
-          width: '200px',
-          height: '1080px',
+          width: 'clamp(120px, 10vw, 240px)',
+          height: '100vh',
           flexShrink: 0,
         }}
         aria-hidden="true"
       />
 
       {/* Main board area */}
-      <div style={{ flex: '1 1 0', minWidth: 0, height: '1080px' }}>
+      <div style={{ flex: '1 1 0', minWidth: 0, height: '100vh' }}>
         <KanbanBoard />
       </div>
     </div>

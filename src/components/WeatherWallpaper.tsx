@@ -39,8 +39,8 @@ export function WeatherWallpaper({ runtimeConfig }: { runtimeConfig: RuntimeConf
   return (
     <div
       style={{
-        width: "1920px",
-        height: "1080px",
+        width: "100vw",
+        height: "100vh",
         position: "relative",
         overflow: "hidden",
         backgroundImage: runtimeConfig.weather.backgroundImageUrl
@@ -62,7 +62,7 @@ export function WeatherWallpaper({ runtimeConfig }: { runtimeConfig: RuntimeConf
         style={{
           position: "absolute",
           ...weatherCornerStyle(runtimeConfig.weather.corner),
-          width: "520px",
+          width: "min(520px, calc(100vw - 48px))",
           padding: "12px",
           borderRadius: "14px",
           backdropFilter: "blur(10px)",

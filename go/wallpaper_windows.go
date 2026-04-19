@@ -57,6 +57,13 @@ type iDesktopWallpaper struct {
 	lpVtbl *iDesktopWallpaperVtbl
 }
 
+type monitorRect struct {
+	Left   int32
+	Top    int32
+	Right  int32
+	Bottom int32
+}
+
 var (
 	clsidDesktopWallpaper = guid{0xC2CF3110, 0x460E, 0x4FC1, [8]byte{0xB9, 0xD0, 0x8A, 0x1C, 0x0C, 0x9C, 0xC4, 0xBD}}
 	iidIDesktopWallpaper  = guid{0xB92B56A9, 0x8B55, 0x4E14, [8]byte{0x9A, 0x89, 0x01, 0x99, 0xBB, 0xB6, 0xF9, 0x3B}}
@@ -202,6 +209,69 @@ func listMonitorIndexes() ([]int, error) {
 		indexes = append(indexes, i)
 	}
 	return indexes, nil
+}
+
+func monitorSize(monitorIndex int) (int, int, error) {
+	if monitorIndex < 0 {
+		return 0, 0, fmt.Errorf("monitor index must be >= 0")
+	}
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	hr, _, _ := procCoInitializeEx.Call(0, coInitApartmentThreaded)
+	if hresultFailed(hr) {
+		return 0, 0, fmt.Errorf("CoInitializeEx failed: HRESULT 0x%08X", uint32(hr))
+	}
+	defer procCoUninitialize.Call()
+
+	wallpaper, err := createDesktopWallpaper()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer syscall.SyscallN(
+		wallpaper.lpVtbl.Release,
+		uintptr(unsafe.Pointer(wallpaper)),
+	)
+
+	count, err := monitorCountFromDesktopWallpaper(wallpaper)
+	if err != nil {
+		return 0, 0, err
+	}
+	if monitorIndex >= count {
+		return 0, 0, fmt.Errorf("monitor index %d out of range (found %d monitor(s))", monitorIndex, count)
+	}
+
+	var monitorID *uint16
+	hr, _, _ = syscall.SyscallN(
+		wallpaper.lpVtbl.GetMonitorPathAt,
+		uintptr(unsafe.Pointer(wallpaper)),
+		uintptr(uint32(monitorIndex)),
+		uintptr(unsafe.Pointer(&monitorID)),
+	)
+	if hresultFailed(hr) {
+		return 0, 0, fmt.Errorf("IDesktopWallpaper.GetMonitorDevicePathAt(%d) failed: HRESULT 0x%08X", monitorIndex, uint32(hr))
+	}
+	defer procCoTaskMemFree.Call(uintptr(unsafe.Pointer(monitorID)))
+
+	var rect monitorRect
+	hr, _, _ = syscall.SyscallN(
+		wallpaper.lpVtbl.GetMonitorRECT,
+		uintptr(unsafe.Pointer(wallpaper)),
+		uintptr(unsafe.Pointer(monitorID)),
+		uintptr(unsafe.Pointer(&rect)),
+	)
+	if hresultFailed(hr) {
+		return 0, 0, fmt.Errorf("IDesktopWallpaper.GetMonitorRECT(%d) failed: HRESULT 0x%08X", monitorIndex, uint32(hr))
+	}
+
+	width := int(rect.Right - rect.Left)
+	height := int(rect.Bottom - rect.Top)
+	if width < 1 || height < 1 {
+		return 0, 0, fmt.Errorf("invalid monitor size for index %d: %dx%d", monitorIndex, width, height)
+	}
+
+	return width, height, nil
 }
 
 func monitorCount() (int, error) {

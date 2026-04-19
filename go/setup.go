@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"html/template"
+	"image"
+	"image/draw"
+	"image/png"
 	"io"
 	"log"
 	"net"
@@ -15,6 +19,11 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	_ "image/jpeg"
+
+	xdraw "golang.org/x/image/draw"
+	_ "golang.org/x/image/webp"
 )
 
 type setupPageData struct {
@@ -313,7 +322,7 @@ func parseSetupForm(r *http.Request, monitorIndexes []int, configDir string) (ap
 	file, header, err := r.FormFile("weather_background_upload")
 	if err == nil {
 		defer file.Close()
-		savedPath, saveErr := saveWeatherBackgroundUpload(file, header.Filename, configDir)
+		savedPath, saveErr := saveWeatherBackgroundUpload(file, header.Filename, configDir, monitorIndexes)
 		if saveErr != nil {
 			return appConfig{}, saveErr
 		}
@@ -377,7 +386,7 @@ func hasWeatherProvider(assignments []monitorProviderAssignment) bool {
 	return false
 }
 
-func saveWeatherBackgroundUpload(src io.Reader, originalFilename string, configDir string) (string, error) {
+func saveWeatherBackgroundUpload(src io.Reader, originalFilename string, configDir string, monitorIndexes []int) (string, error) {
 	ext := strings.ToLower(filepath.Ext(originalFilename))
 	switch ext {
 	case ".jpg", ".jpeg", ".png", ".webp":
@@ -385,18 +394,95 @@ func saveWeatherBackgroundUpload(src io.Reader, originalFilename string, configD
 		return "", fmt.Errorf("weather background must be one of: .jpg, .jpeg, .png, .webp")
 	}
 
-	destPath := filepath.Join(configDir, "weather-background"+ext)
+	rawBytes, err := io.ReadAll(src)
+	if err != nil {
+		return "", fmt.Errorf("failed to read weather background upload: %w", err)
+	}
+
+	decoded, _, err := image.Decode(bytes.NewReader(rawBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed to decode weather background image: %w", err)
+	}
+
+	targetWidth, targetHeight := targetBackgroundSize(monitorIndexes)
+	resized := resizeImageCover(decoded, targetWidth, targetHeight)
+
+	destPath := filepath.Join(configDir, "weather-background.png")
 	destFile, err := os.Create(destPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to save weather background: %w", err)
 	}
 	defer destFile.Close()
 
-	if _, err := io.Copy(destFile, src); err != nil {
+	if err := png.Encode(destFile, resized); err != nil {
 		return "", fmt.Errorf("failed to write weather background: %w", err)
 	}
 
 	return destPath, nil
+}
+
+func targetBackgroundSize(monitorIndexes []int) (int, int) {
+	maxWidth := 0
+	maxHeight := 0
+	for _, idx := range monitorIndexes {
+		width, height, err := monitorSize(idx)
+		if err != nil {
+			continue
+		}
+		if width > maxWidth {
+			maxWidth = width
+		}
+		if height > maxHeight {
+			maxHeight = height
+		}
+	}
+
+	if maxWidth < 1 || maxHeight < 1 {
+		return 1920, 1080
+	}
+	return maxWidth, maxHeight
+}
+
+func resizeImageCover(src image.Image, targetWidth int, targetHeight int) image.Image {
+	if targetWidth < 1 {
+		targetWidth = 1920
+	}
+	if targetHeight < 1 {
+		targetHeight = 1080
+	}
+
+	srcBounds := src.Bounds()
+	srcWidth := srcBounds.Dx()
+	srcHeight := srcBounds.Dy()
+	if srcWidth < 1 || srcHeight < 1 {
+		return image.NewRGBA(image.Rect(0, 0, targetWidth, targetHeight))
+	}
+
+	scaleX := float64(targetWidth) / float64(srcWidth)
+	scaleY := float64(targetHeight) / float64(srcHeight)
+	scale := scaleX
+	if scaleY > scale {
+		scale = scaleY
+	}
+
+	scaledWidth := int(float64(srcWidth)*scale + 0.5)
+	scaledHeight := int(float64(srcHeight)*scale + 0.5)
+	if scaledWidth < targetWidth {
+		scaledWidth = targetWidth
+	}
+	if scaledHeight < targetHeight {
+		scaledHeight = targetHeight
+	}
+
+	scaled := image.NewRGBA(image.Rect(0, 0, scaledWidth, scaledHeight))
+	xdraw.CatmullRom.Scale(scaled, scaled.Bounds(), src, srcBounds, xdraw.Over, nil)
+
+	offsetX := (scaledWidth - targetWidth) / 2
+	offsetY := (scaledHeight - targetHeight) / 2
+	dst := image.NewRGBA(image.Rect(0, 0, targetWidth, targetHeight))
+	draw.Draw(dst, dst.Bounds(), scaled, image.Point{X: offsetX, Y: offsetY}, draw.Src)
+
+	return dst
 }
 
 var setupPageTemplate = template.Must(template.New("setup").Parse(`<!DOCTYPE html>
