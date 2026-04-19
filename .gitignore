@@ -42,6 +42,6 @@ go/rsrc_windows_amd64.syso
 go/rsrc_windows_386.syso
 
 weather-background.*
-*.exe
 *.png
 *.jpg
+!.github/**/*.png
