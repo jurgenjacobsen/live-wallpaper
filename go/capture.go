@@ -20,6 +20,8 @@ func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider 
 	}
 
 	switch provider {
+	case providerNone:
+		renderURL.Path = "/"
 	case providerWeather:
 		renderURL.Path = "/weather"
 	default:

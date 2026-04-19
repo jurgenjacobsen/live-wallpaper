@@ -1,4 +1,4 @@
-# live-wallpaper
+# Live Wallpaper
 
 Live Wallpaper is a Windows desktop app that turns your wallpaper into a live status board.
 

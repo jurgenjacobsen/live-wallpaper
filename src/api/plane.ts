@@ -9,7 +9,7 @@ import type {
 
 const BASE_URL = "/plane-api";
 
-export type RuntimeProvider = "plane" | "weather";
+export type RuntimeProvider = "none" | "plane" | "weather";
 export type WeatherCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface RuntimeConfig {

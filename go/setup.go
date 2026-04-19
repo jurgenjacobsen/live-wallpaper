@@ -85,7 +85,7 @@ func runSetupSession(configPath string, firstRun bool) (appConfig, error) {
 	} else {
 		existing.MonitorAssignments = []monitorProviderAssignment{{
 			MonitorIndex: 0,
-			Provider:     providerPlane,
+			Provider:     providerNone,
 		}}
 		existing.Weather.Corner = cornerTopRight
 		existing.PlaneUpdateIntervalMinutes = defaultPlaneUpdateIntervalMinutes
@@ -243,8 +243,9 @@ func runSetupSession(configPath string, firstRun bool) (appConfig, error) {
 
 func monitorProvidersFromConfig(cfg appConfig, monitorIndexes []int) map[int]wallpaperProvider {
 	providers := make(map[int]wallpaperProvider, len(monitorIndexes))
+	defaultProvider := defaultProviderForUnassignedMonitors(cfg)
 	for _, idx := range monitorIndexes {
-		providers[idx] = providerPlane
+		providers[idx] = defaultProvider
 	}
 	for _, assignment := range cfg.MonitorAssignments {
 		providers[assignment.MonitorIndex] = assignment.Provider
@@ -252,12 +253,27 @@ func monitorProvidersFromConfig(cfg appConfig, monitorIndexes []int) map[int]wal
 	return providers
 }
 
+func defaultProviderForUnassignedMonitors(cfg appConfig) wallpaperProvider {
+	if len(cfg.MonitorAssignments) > 0 {
+		return cfg.MonitorAssignments[0].Provider
+	}
+
+	planeConfigured := strings.TrimSpace(cfg.Plane.APIKey) != "" || strings.TrimSpace(cfg.Plane.WorkspaceSlug) != "" || strings.TrimSpace(cfg.Plane.ProjectID) != ""
+	weatherConfigured := strings.TrimSpace(cfg.Weather.APIKey) != "" || strings.TrimSpace(cfg.Weather.City) != "" || strings.TrimSpace(cfg.Weather.BackgroundImagePath) != ""
+
+	if weatherConfigured && !planeConfigured {
+		return providerWeather
+	}
+
+	return providerNone
+}
+
 func monitorProvidersFromForm(r *http.Request, monitorIndexes []int) map[int]wallpaperProvider {
 	providers := make(map[int]wallpaperProvider, len(monitorIndexes))
 	for _, idx := range monitorIndexes {
 		provider := wallpaperProvider(strings.TrimSpace(r.FormValue(fmt.Sprintf("monitor_provider_%d", idx))))
-		if provider != providerPlane && provider != providerWeather {
-			provider = providerPlane
+		if provider != providerNone && provider != providerPlane && provider != providerWeather {
+			provider = providerNone
 		}
 		providers[idx] = provider
 	}
@@ -310,7 +326,7 @@ func parseSetupForm(r *http.Request, monitorIndexes []int, configDir string) (ap
 	for _, idx := range monitorIndexes {
 		raw := strings.TrimSpace(r.FormValue(fmt.Sprintf("monitor_provider_%d", idx)))
 		provider := wallpaperProvider(raw)
-		if provider != providerPlane && provider != providerWeather {
+		if provider != providerNone && provider != providerPlane && provider != providerWeather {
 			return appConfig{}, fmt.Errorf("monitor %d has invalid provider %q", idx, raw)
 		}
 		cfg.MonitorAssignments = append(cfg.MonitorAssignments, monitorProviderAssignment{
@@ -321,7 +337,7 @@ func parseSetupForm(r *http.Request, monitorIndexes []int, configDir string) (ap
 	if len(cfg.MonitorAssignments) == 0 {
 		cfg.MonitorAssignments = []monitorProviderAssignment{{
 			MonitorIndex: 0,
-			Provider:     providerPlane,
+			Provider:     providerNone,
 		}}
 	}
 
@@ -464,6 +480,7 @@ var setupPageTemplate = template.Must(template.New("setup").Parse(`<!DOCTYPE htm
           <div class="monitor">
             <label for="monitor_provider_{{.}}">Monitor {{.}}</label>
             <select id="monitor_provider_{{.}}" name="monitor_provider_{{.}}">
+							<option value="none" {{if eq (index $.MonitorProviders .) "none"}}selected{{end}}>None</option>
               <option value="plane" {{if eq (index $.MonitorProviders .) "plane"}}selected{{end}}>Plane board</option>
               <option value="weather" {{if eq (index $.MonitorProviders .) "weather"}}selected{{end}}>Weather</option>
             </select>

@@ -61,6 +61,18 @@ function App() {
     return <WeatherWallpaper runtimeConfig={runtimeConfig} />
   }
 
+  if (runtimeConfig?.selectedProvider === 'none') {
+    return (
+      <div
+        style={{
+          width: '1920px',
+          height: '1080px',
+          background: 'linear-gradient(135deg, #0b1220, #111827)',
+        }}
+      />
+    )
+  }
+
   return (
     <div
       style={{

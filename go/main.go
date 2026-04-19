@@ -143,6 +143,10 @@ func main() {
 		log.Printf("[live-wallpaper] updating wallpaper at %s (%s)", time.Now().Format(time.RFC3339), reason)
 
 		for _, assignment := range cfg.MonitorAssignments {
+			if assignment.Provider == providerNone {
+				continue
+			}
+
 			wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d-%s.png", assignment.MonitorIndex, assignment.Provider))
 			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex); captureErr != nil {
 				if ctx.Err() != nil {

@@ -118,7 +118,7 @@ func newHandler(cfg appConfig) http.Handler {
 }
 
 func resolveRuntimeSelection(r *http.Request, cfg appConfig) (wallpaperProvider, int) {
-	defaultAssignment := monitorProviderAssignment{MonitorIndex: 0, Provider: providerPlane}
+	defaultAssignment := monitorProviderAssignment{MonitorIndex: 0, Provider: providerNone}
 	if len(cfg.MonitorAssignments) > 0 {
 		defaultAssignment = cfg.MonitorAssignments[0]
 	}
@@ -140,7 +140,7 @@ func resolveRuntimeSelection(r *http.Request, cfg appConfig) (wallpaperProvider,
 
 	provider := assignmentForMonitor.Provider
 	rawProvider := wallpaperProvider(strings.TrimSpace(r.URL.Query().Get("provider")))
-	if rawProvider == providerPlane || rawProvider == providerWeather {
+	if rawProvider == providerNone || rawProvider == providerPlane || rawProvider == providerWeather {
 		provider = rawProvider
 	}
 

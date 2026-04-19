@@ -20,6 +20,7 @@ const (
 type wallpaperProvider string
 
 const (
+	providerNone    wallpaperProvider = "none"
 	providerPlane   wallpaperProvider = "plane"
 	providerWeather wallpaperProvider = "weather"
 )
@@ -106,6 +107,7 @@ func (c appConfig) validate() error {
 		seen[idx] = struct{}{}
 
 		switch assignment.Provider {
+		case providerNone:
 		case providerPlane:
 			usesPlane = true
 		case providerWeather:
@@ -133,9 +135,6 @@ func (c appConfig) validate() error {
 		}
 		if strings.TrimSpace(c.Weather.City) == "" {
 			return fmt.Errorf("weather city is required when weather provider is assigned")
-		}
-		if strings.TrimSpace(c.Weather.BackgroundImagePath) == "" {
-			return fmt.Errorf("weather background image is required when weather provider is assigned")
 		}
 	}
 
@@ -182,7 +181,7 @@ func (c appConfig) normalized() appConfig {
 		if assignment.MonitorIndex < 0 {
 			continue
 		}
-		if assignment.Provider != providerPlane && assignment.Provider != providerWeather {
+		if assignment.Provider != providerNone && assignment.Provider != providerPlane && assignment.Provider != providerWeather {
 			continue
 		}
 		if _, exists := set[assignment.MonitorIndex]; exists {
@@ -219,14 +218,14 @@ func (c appConfig) migrateLegacyIfNeeded() appConfig {
 		if clone.MonitorAllLegacy {
 			clone.MonitorAssignments = []monitorProviderAssignment{{
 				MonitorIndex: 0,
-				Provider:     providerPlane,
+				Provider:     providerNone,
 			}}
 		} else if len(clone.MonitorIndexesLegacy) > 0 {
 			clone.MonitorAssignments = make([]monitorProviderAssignment, 0, len(clone.MonitorIndexesLegacy))
 			for _, idx := range clone.MonitorIndexesLegacy {
 				clone.MonitorAssignments = append(clone.MonitorAssignments, monitorProviderAssignment{
 					MonitorIndex: idx,
-					Provider:     providerPlane,
+					Provider:     providerNone,
 				})
 			}
 		}
@@ -235,7 +234,7 @@ func (c appConfig) migrateLegacyIfNeeded() appConfig {
 	if len(clone.MonitorAssignments) == 0 {
 		clone.MonitorAssignments = []monitorProviderAssignment{{
 			MonitorIndex: 0,
-			Provider:     providerPlane,
+			Provider:     providerNone,
 		}}
 	}
 
@@ -333,8 +332,8 @@ func isValidWeatherCorner(corner weatherWidgetCorner) bool {
 }
 
 func buildMonitorAssignments(monitorIndexes []int, provider wallpaperProvider) []monitorProviderAssignment {
-	if provider != providerPlane && provider != providerWeather {
-		provider = providerPlane
+	if provider != providerNone && provider != providerPlane && provider != providerWeather {
+		provider = providerNone
 	}
 
 	assignments := make([]monitorProviderAssignment, 0, len(monitorIndexes))
