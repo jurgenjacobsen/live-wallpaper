@@ -1,6 +1,14 @@
 # Live Wallpaper
-
 Live Wallpaper is a Windows desktop app that turns your wallpaper into a live status board.
+
+[![Wakatime](https://wakatime.com/badge/user/010adc07-6382-419f-87bc-0b3f507ee495/project/eee66166-c674-42b2-bfff-907328a4099c.svg)](https://wakatime.com/badge/user/010adc07-6382-419f-87bc-0b3f507ee495/project/eee66166-c674-42b2-bfff-907328a4099c)
+![GitHub License](https://img.shields.io/github/license/jurgenjacobsen/live-wallpaper)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/jurgenjacobsen/live-wallpaper/total)
+![GitHub package.json dynamic](https://img.shields.io/github/package-json/version/jurgenjacobsen/live-wallpaper?label=latest)
+![GitHub code size in bytes](https://img.shields.io/github/languages/code-size/jurgenjacobsen/live-wallpaper)
+![GitHub last commit](https://img.shields.io/github/last-commit/jurgenjacobsen/live-wallpaper)
+
+
 
 It packages a React UI and a Go runtime into a single executable (`Live Wallpaper.exe`). The app serves the UI locally, captures it with headless Chrome, and applies it as wallpaper per monitor. It supports both Plane Kanban data and weather widgets, with monitor-level provider assignment.
 
@@ -14,8 +22,21 @@ It packages a React UI and a Go runtime into a single executable (`Live Wallpape
 - Automatic update check on startup via GitHub Releases
 - Manual update check from the tray menu
 
-## Runtime behavior
+## Available providers
 
+### Weather
+
+Show current weather conditions and forecasts for your location. See [Weather provider docs](./docs/providers/weather.md) for setup instructions.
+
+![Live Wallpaper - Weather](/.github/assets/screenshot2.png)
+
+### Plane.so
+
+Connect your Plane account to display your boards and tasks. See [Plane.so provider docs](./docs/providers/plane.md) for setup instructions.
+
+![Live Wallpaper - Plane.so Boards](/.github/assets/screenshot1.png)
+
+## Runtime behavior
 On startup, the app:
 1. Loads or creates `live-wallpaper-config.json` next to the executable
 2. Starts a local HTTP server for the embedded frontend
@@ -35,7 +56,6 @@ The tray icon currently provides:
 - Shutdown
 
 ## Architecture
-
 | Layer | Tech |
 |-------|------|
 | UI | React 19 + TypeScript + Tailwind CSS v4 via Vite |
@@ -47,7 +67,6 @@ The tray icon currently provides:
 | Update checks | GitHub Releases API |
 
 ## Repository structure
-
 ```
 .
 ├─ go/                     # Go runtime and main application module
@@ -65,9 +84,7 @@ The tray icon currently provides:
 ---
 
 ## Build `Live Wallpaper.exe`
-
 ### Prerequisites
-
 | Tool | Where to get it |
 |------|-----------------|
 | Node.js >= 18 | https://nodejs.org |
@@ -77,7 +94,6 @@ The tray icon currently provides:
 Chrome is required at runtime for headless capture.
 
 ### Build commands
-
 Windows:
 
 ```cmd
@@ -101,7 +117,6 @@ Output:
 - `Live Wallpaper.exe` in repository root
 
 ## Build installer (`.exe`)
-
 The project includes an Inno Setup installer with:
 
 - User-selectable install location
@@ -137,14 +152,12 @@ Notes:
 - This avoids admin requirements and keeps config/logs writable
 
 ## Update delivery model
-
 - App checks latest GitHub release once at startup
 - User can manually trigger check via tray (`Check for updates`)
 - If a newer version exists, the app prompts to open the release page
 - Recommended release process: publish a new installer for each version
 
 ## Development workflow (frontend/util scripts)
-
 For frontend-only iteration:
 
 ```bash
@@ -160,15 +173,3 @@ npm run schedule
 ```
 
 These scripts are convenience tools for local development. Production runtime uses the Go app.
-
-## Plane board mapping
-
-Issue columns are grouped as:
-
-| Column | Plane states |
-|--------|---------------|
-| Todo | `backlog`, `unstarted`, `cancelled` |
-| In Progress | `started` |
-| Done | `completed` |
-
-Issues are filtered to the current user, and to active cycle issues when a cycle exists.
