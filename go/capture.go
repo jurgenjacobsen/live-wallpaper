@@ -13,7 +13,7 @@ import (
 // captureWallpaper launches headless Chrome, navigates to url, waits for the
 // React app to finish rendering (fonts + data), takes a screenshot using the
 // monitor's resolution, and saves the PNG to outputPath.
-func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider wallpaperProvider, monitorIndex int, width int, height int) error {
+func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider wallpaperProvider, monitorIndex int, width int, height int, readyState *frontendReadyState) error {
 	if width < 1 || height < 1 {
 		return fmt.Errorf("invalid capture size %dx%d", width, height)
 	}
@@ -58,13 +58,38 @@ func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider 
 		chromedp.Navigate(renderURL.String()),
 		// Wait for the DOM to be ready.
 		chromedp.WaitVisible("body", chromedp.ByQuery),
-		// Give the React app time to fetch Plane.so data and render it,
-		// and for custom fonts to finish loading.
-		chromedp.Sleep(5*time.Second),
+	); err != nil {
+		return fmt.Errorf("initial page render failed: %w", err)
+	}
+
+	if err := waitForFrontendReady(timeoutCtx, readyState, provider, monitorIndex); err != nil {
+		return err
+	}
+
+	if err := chromedp.Run(timeoutCtx,
+		// Small delay allows splash fade-out transition to complete.
+		chromedp.Sleep(250*time.Millisecond),
 		chromedp.CaptureScreenshot(&buf),
 	); err != nil {
-		return fmt.Errorf("screenshot failed: %w", err)
+		return fmt.Errorf("screenshot failed after frontend ready: %w", err)
 	}
 
 	return os.WriteFile(outputPath, buf, 0644)
+}
+
+func waitForFrontendReady(ctx context.Context, readyState *frontendReadyState, provider wallpaperProvider, monitorIndex int) error {
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		if readyState.IsReady(provider, monitorIndex) {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for frontend ready signal: %w", ctx.Err())
+		case <-ticker.C:
+		}
+	}
 }

@@ -1,5 +1,11 @@
+import { useEffect, useRef } from "react";
 import type { RuntimeConfig } from "../api/plane";
 import { useWeatherData } from "../hooks/useWeatherData";
+
+interface WeatherWallpaperProps {
+  runtimeConfig: RuntimeConfig;
+  onInitialDataReady?: () => void;
+}
 
 function formatUpdatedAtLabel(value: string): string {
   const parsed = new Date(value);
@@ -33,8 +39,16 @@ function weatherCornerStyle(corner: RuntimeConfig["weather"]["corner"]): React.C
   }
 }
 
-export function WeatherWallpaper({ runtimeConfig }: { runtimeConfig: RuntimeConfig }) {
+export function WeatherWallpaper({ runtimeConfig, onInitialDataReady }: WeatherWallpaperProps) {
   const { weather, loading, error } = useWeatherData();
+  const notifiedRef = useRef(false);
+
+  useEffect(() => {
+    if (!loading && !notifiedRef.current) {
+      notifiedRef.current = true;
+      onInitialDataReady?.();
+    }
+  }, [loading, onInitialDataReady]);
 
   return (
     <div

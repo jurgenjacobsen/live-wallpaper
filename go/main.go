@@ -38,6 +38,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("[live-wallpaper] setup/config failed: %v", err)
 	}
+
+	closeSplash := func() {}
+	splashCloser, splashErr := showSplashWindow()
+	if splashErr != nil {
+		log.Printf("[live-wallpaper] splash window unavailable: %v", splashErr)
+	} else {
+		closeSplash = splashCloser
+	}
+	defer closeSplash()
+
 	log.Printf("[live-wallpaper] targeting %s", cfg.displayMonitorSelection())
 	log.Printf("[live-wallpaper] plane interval: every %d minute(s)", cfg.PlaneUpdateIntervalMinutes)
 	log.Printf("[live-wallpaper] weather interval: every %d minute(s)", cfg.WeatherUpdateIntervalMinutes)
@@ -84,8 +94,9 @@ func main() {
 	}
 	port := ln.Addr().(*net.TCPAddr).Port
 	serverURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+	readyState := newFrontendReadyState()
 
-	srv := &http.Server{Handler: newHandler(cfg)}
+	srv := &http.Server{Handler: newHandler(cfg, readyState)}
 	go func() {
 		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
 			log.Printf("[live-wallpaper] HTTP server error: %v", serveErr)
@@ -147,6 +158,8 @@ func main() {
 				continue
 			}
 
+			readyState.Reset(assignment.Provider, assignment.MonitorIndex)
+
 			width, height, sizeErr := monitorSize(assignment.MonitorIndex)
 			if sizeErr != nil {
 				log.Printf("[live-wallpaper] monitor size lookup failed for monitor %d, using fallback 1920x1080: %v", assignment.MonitorIndex, sizeErr)
@@ -155,7 +168,7 @@ func main() {
 			}
 
 			wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d-%s.png", assignment.MonitorIndex, assignment.Provider))
-			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height); captureErr != nil {
+			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height, readyState); captureErr != nil {
 				if ctx.Err() != nil {
 					log.Printf("[live-wallpaper] update canceled during shutdown")
 					return
@@ -188,6 +201,8 @@ func main() {
 				continue
 			}
 
+			readyState.Reset(assignment.Provider, assignment.MonitorIndex)
+
 			width, height, sizeErr := monitorSize(assignment.MonitorIndex)
 			if sizeErr != nil {
 				log.Printf("[live-wallpaper] monitor size lookup failed for monitor %d, using fallback 1920x1080: %v", assignment.MonitorIndex, sizeErr)
@@ -196,7 +211,7 @@ func main() {
 			}
 
 			wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d-%s.png", assignment.MonitorIndex, assignment.Provider))
-			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height); captureErr != nil {
+			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height, readyState); captureErr != nil {
 				if ctx.Err() != nil {
 					log.Printf("[live-wallpaper] update canceled during shutdown")
 					return
@@ -249,6 +264,8 @@ func main() {
 	// as soon as the app launches.
 	runProviderUpdate(providerWeather, "startup")
 	runProviderUpdate(providerPlane, "startup")
+	closeSplash()
+	closeSplash = func() {}
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)

@@ -84,6 +84,13 @@ type dayReport struct {
 }
 
 func fetchWeatherForecast(ctx context.Context, apiKey, city string) (weatherForecastPayload, error) {
+	requestCtx := ctx
+	if _, hasDeadline := ctx.Deadline(); !hasDeadline {
+		var cancel context.CancelFunc
+		requestCtx, cancel = context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+	}
+
 	endpoint, _ := url.Parse("https://api.openweathermap.org/data/2.5/forecast")
 	query := endpoint.Query()
 	query.Set("q", strings.TrimSpace(city))
@@ -91,7 +98,7 @@ func fetchWeatherForecast(ctx context.Context, apiKey, city string) (weatherFore
 	query.Set("units", "metric")
 	endpoint.RawQuery = query.Encode()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint.String(), nil)
+	req, err := http.NewRequestWithContext(requestCtx, http.MethodGet, endpoint.String(), nil)
 	if err != nil {
 		return weatherForecastPayload{}, err
 	}

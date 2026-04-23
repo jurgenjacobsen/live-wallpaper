@@ -24,7 +24,7 @@ var distFS embed.FS
 //   - Exposes weather forecast payload under /api/weather-forecast
 //   - Exposes weather background image under /api/weather-background
 //   - Serves the embedded React production build for all other paths
-func newHandler(cfg appConfig) http.Handler {
+func newHandler(cfg appConfig, readyState *frontendReadyState) http.Handler {
 	sub, err := fs.Sub(distFS, "dist")
 	if err != nil {
 		panic("embedded dist/ directory not found: " + err.Error())
@@ -43,6 +43,39 @@ func newHandler(cfg appConfig) http.Handler {
 	}
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/frontend-ready", func(w http.ResponseWriter, r *http.Request) {
+		providerRaw := strings.TrimSpace(r.URL.Query().Get("provider"))
+		monitorRaw := strings.TrimSpace(r.URL.Query().Get("monitor"))
+
+		provider := wallpaperProvider(providerRaw)
+		switch provider {
+		case providerNone, providerPlane, providerWeather:
+		default:
+			http.Error(w, "invalid provider", http.StatusBadRequest)
+			return
+		}
+
+		monitorIndex, err := strconv.Atoi(monitorRaw)
+		if err != nil || monitorIndex < 0 {
+			http.Error(w, "invalid monitor", http.StatusBadRequest)
+			return
+		}
+
+		if r.Method == http.MethodPost {
+			readyState.MarkReady(provider, monitorIndex)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]bool{"ready": readyState.IsReady(provider, monitorIndex)})
+	})
+
 	mux.HandleFunc("/api/runtime-config", func(w http.ResponseWriter, r *http.Request) {
 		provider, monitorIndex := resolveRuntimeSelection(r, cfg)
 		weatherBackgroundImageURL := ""

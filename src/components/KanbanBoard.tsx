@@ -1,5 +1,10 @@
+import { useEffect, useRef } from "react";
 import { usePlaneData } from "../hooks/usePlaneData";
 import { KanbanColumn } from "./KanbanColumn";
+
+interface KanbanBoardProps {
+  onInitialDataReady?: () => void;
+}
 
 const COLUMN_CONFIG = [
   {
@@ -60,8 +65,16 @@ function ErrorState({ message }: { message: string }) {
   );
 }
 
-export function KanbanBoard() {
+export function KanbanBoard({ onInitialDataReady }: KanbanBoardProps) {
   const { groupedIssues, states, projectName, loading, error, lastUpdated } = usePlaneData();
+  const notifiedRef = useRef(false);
+
+  useEffect(() => {
+    if (!loading && !notifiedRef.current) {
+      notifiedRef.current = true;
+      onInitialDataReady?.();
+    }
+  }, [loading, onInitialDataReady]);
 
   const totalIssues =
     groupedIssues.todo.length +
