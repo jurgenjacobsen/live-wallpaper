@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "sync:icon": "tsx scripts/sync-icon.ts",
     "build:exe": "build.bat",
     "build:installer": "build-installer.bat",
     "lint": "eslint .",

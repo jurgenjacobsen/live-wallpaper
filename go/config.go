@@ -55,6 +55,7 @@ type monitorProviderAssignment struct {
 type appConfig struct {
 	ConfigVersion                int                         `json:"configVersion"`
 	LastUpdatedAtUnix            int64                       `json:"lastUpdatedAtUnix,omitempty"`
+	RunOnStartup                 bool                        `json:"runOnStartup,omitempty"`
 	PlaneUpdateIntervalMinutes   int                         `json:"planeUpdateIntervalMinutes"`
 	WeatherUpdateIntervalMinutes int                         `json:"weatherUpdateIntervalMinutes"`
 	Plane                        providerPlaneConfig         `json:"plane"`

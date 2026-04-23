@@ -33,6 +33,7 @@ type setupPageData struct {
 	SubmitLabel                  string
 	SuccessMessage               string
 	ConfigPath                   string
+	RunOnStartup                 bool
 	PlaneUpdateIntervalMinutes   int
 	WeatherUpdateIntervalMinutes int
 	MonitorIndexes               []int
@@ -133,6 +134,7 @@ func runSetupSession(configPath string, firstRun bool) (appConfig, error) {
 		SubmitLabel:                  submitLabel,
 		SuccessMessage:               successMessage,
 		ConfigPath:                   configPath,
+		RunOnStartup:                 existing.RunOnStartup,
 		PlaneUpdateIntervalMinutes:   existing.PlaneUpdateIntervalMinutes,
 		WeatherUpdateIntervalMinutes: existing.WeatherUpdateIntervalMinutes,
 		MonitorIndexes:               monitorIndexes,
@@ -167,6 +169,7 @@ func runSetupSession(configPath string, firstRun bool) (appConfig, error) {
 				SubmitLabel:                  submitLabel,
 				SuccessMessage:               successMessage,
 				ConfigPath:                   configPath,
+				RunOnStartup:                 strings.TrimSpace(r.FormValue("run_on_startup")) != "",
 				PlaneUpdateIntervalMinutes:   mustAtoiOrDefault(strings.TrimSpace(r.FormValue("plane_update_interval_minutes")), defaultPlaneUpdateIntervalMinutes),
 				WeatherUpdateIntervalMinutes: mustAtoiOrDefault(strings.TrimSpace(r.FormValue("weather_update_interval_minutes")), defaultWeatherUpdateIntervalMinutes),
 				MonitorIndexes:               monitorIndexes,
@@ -191,6 +194,7 @@ func runSetupSession(configPath string, firstRun bool) (appConfig, error) {
 				SubmitLabel:                  submitLabel,
 				SuccessMessage:               successMessage,
 				ConfigPath:                   configPath,
+				RunOnStartup:                 cfg.RunOnStartup,
 				PlaneUpdateIntervalMinutes:   cfg.PlaneUpdateIntervalMinutes,
 				WeatherUpdateIntervalMinutes: cfg.WeatherUpdateIntervalMinutes,
 				MonitorIndexes:               monitorIndexes,
@@ -203,6 +207,57 @@ func runSetupSession(configPath string, firstRun bool) (appConfig, error) {
 				WeatherCorner:                cfg.Weather.Corner,
 				WeatherBackgroundPath:        cfg.Weather.BackgroundImagePath,
 				Error:                        fmt.Sprintf("failed to save config: %v", err),
+			})
+			return
+		}
+
+		exePath, exeErr := os.Executable()
+		if exeErr != nil {
+			renderSetupPage(w, http.StatusInternalServerError, setupPageData{
+				AppName:                      appDisplayName,
+				Heading:                      heading,
+				Intro:                        intro,
+				SubmitLabel:                  submitLabel,
+				SuccessMessage:               successMessage,
+				ConfigPath:                   configPath,
+				RunOnStartup:                 cfg.RunOnStartup,
+				PlaneUpdateIntervalMinutes:   cfg.PlaneUpdateIntervalMinutes,
+				WeatherUpdateIntervalMinutes: cfg.WeatherUpdateIntervalMinutes,
+				MonitorIndexes:               monitorIndexes,
+				MonitorProviders:             monitorProvidersFromConfig(cfg, monitorIndexes),
+				PlaneAPIKey:                  cfg.Plane.APIKey,
+				PlaneWorkspaceSlug:           cfg.Plane.WorkspaceSlug,
+				PlaneProjectID:               cfg.Plane.ProjectID,
+				WeatherAPIKey:                cfg.Weather.APIKey,
+				WeatherCity:                  cfg.Weather.City,
+				WeatherCorner:                cfg.Weather.Corner,
+				WeatherBackgroundPath:        cfg.Weather.BackgroundImagePath,
+				Error:                        fmt.Sprintf("settings saved but startup registration update failed: %v", exeErr),
+			})
+			return
+		}
+
+		if err := applyRunOnStartupSetting(exePath, cfg.RunOnStartup); err != nil {
+			renderSetupPage(w, http.StatusInternalServerError, setupPageData{
+				AppName:                      appDisplayName,
+				Heading:                      heading,
+				Intro:                        intro,
+				SubmitLabel:                  submitLabel,
+				SuccessMessage:               successMessage,
+				ConfigPath:                   configPath,
+				RunOnStartup:                 cfg.RunOnStartup,
+				PlaneUpdateIntervalMinutes:   cfg.PlaneUpdateIntervalMinutes,
+				WeatherUpdateIntervalMinutes: cfg.WeatherUpdateIntervalMinutes,
+				MonitorIndexes:               monitorIndexes,
+				MonitorProviders:             monitorProvidersFromConfig(cfg, monitorIndexes),
+				PlaneAPIKey:                  cfg.Plane.APIKey,
+				PlaneWorkspaceSlug:           cfg.Plane.WorkspaceSlug,
+				PlaneProjectID:               cfg.Plane.ProjectID,
+				WeatherAPIKey:                cfg.Weather.APIKey,
+				WeatherCity:                  cfg.Weather.City,
+				WeatherCorner:                cfg.Weather.Corner,
+				WeatherBackgroundPath:        cfg.Weather.BackgroundImagePath,
+				Error:                        fmt.Sprintf("settings saved but startup registration update failed: %v", err),
 			})
 			return
 		}
@@ -300,6 +355,7 @@ func parseSetupForm(r *http.Request, monitorIndexes []int, configDir string) (ap
 	}
 
 	cfg := appConfig{
+		RunOnStartup:                 strings.TrimSpace(r.FormValue("run_on_startup")) != "",
 		PlaneUpdateIntervalMinutes:   mustAtoiOrDefault(strings.TrimSpace(r.FormValue("plane_update_interval_minutes")), defaultPlaneUpdateIntervalMinutes),
 		WeatherUpdateIntervalMinutes: mustAtoiOrDefault(strings.TrimSpace(r.FormValue("weather_update_interval_minutes")), defaultWeatherUpdateIntervalMinutes),
 		Plane: providerPlaneConfig{
@@ -518,6 +574,13 @@ var setupPageTemplate = template.Must(template.New("setup").Parse(`<!DOCTYPE htm
     {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
     <form method="post" action="/save" enctype="multipart/form-data">
       <div class="section">
+				<h2>Application</h2>
+				<label for="run_on_startup" style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+					<input id="run_on_startup" name="run_on_startup" type="checkbox" style="width:auto;" {{if .RunOnStartup}}checked{{end}} />
+					<span>Run on startup</span>
+				</label>
+			</div>
+
 			<div class="section">
         <h2>Plane provider</h2>
         <label for="plane_update_interval_minutes">Plane update interval (minutes)</label>

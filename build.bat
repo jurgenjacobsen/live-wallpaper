@@ -1,6 +1,13 @@
 @echo off
 setlocal
 
+echo [build] Synchronizing icon assets...
+call npm run sync:icon
+if %ERRORLEVEL% NEQ 0 (
+    echo [build] ERROR: npm run sync:icon failed.
+    exit /b %ERRORLEVEL%
+)
+
 echo [build] Building React frontend...
 set VITE_PLANE_API_BASE_URL=/plane-api
 call npm run build

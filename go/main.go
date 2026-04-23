@@ -38,6 +38,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("[live-wallpaper] setup/config failed: %v", err)
 	}
+	if err := applyRunOnStartupSetting(exePath, cfg.RunOnStartup); err != nil {
+		log.Printf("[live-wallpaper] run-on-startup sync failed: %v", err)
+	}
 
 	closeSplash := func() {}
 	splashCloser, splashErr := showSplashWindow()
@@ -105,6 +108,7 @@ func main() {
 	log.Printf("[live-wallpaper] serving React app at %s", serverURL)
 
 	appArgs := append([]string(nil), os.Args[1:]...)
+	configPath := filepath.Join(exeDir, appConfigFileName)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -282,7 +286,6 @@ func main() {
 	}()
 
 	if supportsTray() {
-		configPath := filepath.Join(exeDir, appConfigFileName)
 		trayErr := runTray(trayCallbacks{
 			OpenSettings: func() {
 				go func() {
@@ -318,6 +321,33 @@ func main() {
 			},
 			Shutdown: func() {
 				requestShutdown("tray menu: shutdown")
+			},
+			GetRunOnStartupState: func() (bool, error) {
+				enabled, err := isRunOnStartupEnabled(exePath)
+				if err != nil {
+					return false, err
+				}
+				return enabled, nil
+			},
+			ToggleRunOnStartup: func() (bool, error) {
+				current, err := isRunOnStartupEnabled(exePath)
+				if err != nil {
+					return false, err
+				}
+
+				target := !current
+				if err := applyRunOnStartupSetting(exePath, target); err != nil {
+					return current, err
+				}
+
+				if err := persistRunOnStartupSetting(configPath, target); err != nil {
+					_ = applyRunOnStartupSetting(exePath, current)
+					return current, err
+				}
+
+				cfg.RunOnStartup = target
+				log.Printf("[live-wallpaper] run-on-startup %v", map[bool]string{true: "enabled", false: "disabled"}[target])
+				return target, nil
 			},
 		})
 		if trayErr != nil {

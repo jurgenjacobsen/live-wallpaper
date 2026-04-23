@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"fmt"
 	"image/png"
+	"log"
 	"sync/atomic"
 
 	ico "github.com/Kodeworks/golang-image-ico"
@@ -23,7 +24,7 @@ func supportsTray() bool {
 }
 
 func runTray(callbacks trayCallbacks) error {
-	if callbacks.OpenSettings == nil || callbacks.OpenLogs == nil || callbacks.CheckUpdates == nil || callbacks.UpdateNow == nil || callbacks.Restart == nil || callbacks.Shutdown == nil {
+	if callbacks.OpenSettings == nil || callbacks.OpenLogs == nil || callbacks.CheckUpdates == nil || callbacks.UpdateNow == nil || callbacks.Restart == nil || callbacks.Shutdown == nil || callbacks.GetRunOnStartupState == nil || callbacks.ToggleRunOnStartup == nil {
 		return fmt.Errorf("tray callbacks must be provided")
 	}
 
@@ -38,9 +39,16 @@ func runTray(callbacks trayCallbacks) error {
 		systray.SetTitle(appDisplayName)
 		systray.SetTooltip(appDisplayName)
 
+		runOnStartupEnabled, stateErr := callbacks.GetRunOnStartupState()
+		if stateErr != nil {
+			log.Printf("[live-wallpaper] run-on-startup state unavailable: %v", stateErr)
+			runOnStartupEnabled = false
+		}
+
 		openSettings := systray.AddMenuItem("Open settings", "Open the setup/settings page")
 		openLogs := systray.AddMenuItem("Open logs", "Open the log file")
 		checkUpdates := systray.AddMenuItem("Check for updates", "Check GitHub Releases for a newer version")
+		runOnStartup := systray.AddMenuItemCheckbox("Run on startup", "Start Live Wallpaper when you sign in", runOnStartupEnabled)
 		systray.AddSeparator()
 		updateNow := systray.AddMenuItem("Update wallpapers", "Capture and apply wallpaper immediately")
 		restart := systray.AddMenuItem("Restart", "Restart Live Wallpaper")
@@ -56,6 +64,16 @@ func runTray(callbacks trayCallbacks) error {
 					callbacks.OpenLogs()
 				case <-checkUpdates.ClickedCh:
 					callbacks.CheckUpdates()
+				case <-runOnStartup.ClickedCh:
+					enabled, err := callbacks.ToggleRunOnStartup()
+					if err != nil {
+						log.Printf("[live-wallpaper] run-on-startup toggle failed: %v", err)
+					}
+					if enabled {
+						runOnStartup.Check()
+					} else {
+						runOnStartup.Uncheck()
+					}
 				case <-updateNow.ClickedCh:
 					callbacks.UpdateNow()
 				case <-restart.ClickedCh:
