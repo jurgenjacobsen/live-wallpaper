@@ -529,8 +529,8 @@ var setupPageTemplate = template.Must(template.New("setup").Parse(`<!DOCTYPE htm
         <label for="workspace_slug">Workspace slug</label>
         <input id="workspace_slug" name="workspace_slug" type="text" placeholder="my-team" value="{{.PlaneWorkspaceSlug}}" />
 
-        <label for="project_id">Project ID / identifier / name</label>
-        <input id="project_id" name="project_id" type="text" placeholder="ARCHIVUM" value="{{.PlaneProjectID}}" />
+        <label for="project_id">Project ID / identifier</label>
+        <input id="project_id" name="project_id" type="text" placeholder="Project ID" value="{{.PlaneProjectID}}" />
       </div>
 
       <div class="section">

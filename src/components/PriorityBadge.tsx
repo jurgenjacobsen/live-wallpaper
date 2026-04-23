@@ -20,15 +20,15 @@ export function PriorityBadge({ priority }: PriorityBadgeProps) {
 
   return (
     <span
-      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide"
+      className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium tracking-wide"
       style={{
         color: cfg.color,
         backgroundColor: `${cfg.color}1a`,
         border: `1px solid ${cfg.color}33`,
       }}
     >
-      <span>{cfg.icon}</span>
-      {cfg.label}
+    <span>{cfg.icon}</span>
+      {cfg.label.charAt(0).toUpperCase() + cfg.label.slice(1).toLowerCase()}
     </span>
   );
 }

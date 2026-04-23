@@ -4,6 +4,7 @@ import type {
   PlaneState,
   PlaneIssue,
   PlaneMember,
+  PlaneLabel,
   PlaneCycle,
 } from "../types/plane";
 
@@ -138,6 +139,23 @@ export async function fetchCurrentUser(
   return planeFetch<PlaneMember>(
     `/api/v1/workspaces/${workspaceSlug}/members/me/`
   );
+}
+
+export async function fetchWorkspaceMembers(
+  workspaceSlug: string
+): Promise<PlaneMember[]> {
+  const path = `/api/v1/workspaces/${workspaceSlug}/members/`;
+  const data = await planeFetch<unknown>(path);
+  return parseListResponse<PlaneMember>(data, path);
+}
+
+export async function fetchProjectLabels(
+  workspaceSlug: string,
+  projectId: string
+): Promise<PlaneLabel[]> {
+  const path = `/api/v1/workspaces/${workspaceSlug}/projects/${projectId}/labels/`;
+  const data = await planeFetch<unknown>(path);
+  return parseListResponse<PlaneLabel>(data, path);
 }
 
 export async function fetchActiveCycles(

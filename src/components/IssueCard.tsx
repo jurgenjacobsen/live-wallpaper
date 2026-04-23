@@ -21,6 +21,12 @@ function isOverdue(dateStr: string | null): boolean {
 export function IssueCard({ issue }: IssueCardProps) {
   const stateColor = issue.state_detail?.color ?? "#5c5e6e";
   const overdueTarget = isOverdue(issue.target_date);
+  const firstLabel = issue.label_details?.find(
+    (label) => typeof label.name === "string" && label.name.trim() !== ""
+  );
+  const firstAssignee = issue.assignee_details?.find(
+    (member) => typeof member.display_name === "string" && member.display_name.trim() !== ""
+  );
 
   return (
     <div
@@ -44,7 +50,44 @@ export function IssueCard({ issue }: IssueCardProps) {
             #{issue.sequence_id}
           </span>
         </div>
-        <PriorityBadge priority={issue.priority} />
+        <div className="flex items-center gap-1 flex-wrap justify-end">
+          <PriorityBadge priority={issue.priority} />
+          {firstLabel && (
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] font-medium"
+              style={{
+                backgroundColor: `${firstLabel.color}1a`,
+                border: `1px solid ${firstLabel.color}33`,
+                color: firstLabel.color,
+              }}
+              title={firstLabel.name}
+            >
+              {firstLabel.name}
+            </span>
+          )}
+          {firstAssignee && (
+            <span
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium"
+              style={{
+                backgroundColor: "var(--plane-surface)",
+                border: "1px solid var(--plane-border)",
+                color: "var(--plane-text-secondary)",
+              }}
+              title={firstAssignee.display_name}
+            >
+              <span
+                className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-bold"
+                style={{
+                  backgroundColor: "var(--plane-accent)",
+                  color: "#fff",
+                }}
+              >
+                {firstAssignee.display_name.charAt(0).toUpperCase()}
+              </span>
+              {firstAssignee.display_name}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Title */}
@@ -55,65 +98,18 @@ export function IssueCard({ issue }: IssueCardProps) {
         {issue.name}
       </p>
 
-      {/* Footer: labels + date + assignees */}
-      <div className="flex items-center justify-between gap-1 flex-wrap">
-        <div className="flex items-center gap-1 flex-wrap">
-          {issue.label_details?.slice(0, 2).map((label) => (
-            <span
-              key={label.id}
-              className="rounded px-1.5 py-0.5 text-[10px] font-medium"
-              style={{
-                backgroundColor: `${label.color}1a`,
-                border: `1px solid ${label.color}33`,
-                color: label.color,
-              }}
-            >
-              {label.name}
-            </span>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          {issue.target_date && (
-            <span
-              className="text-[10px]"
-              style={{
-                color: overdueTarget ? "#ef4444" : "var(--plane-text-muted)",
-              }}
-            >
-              {formatDate(issue.target_date)}
-            </span>
-          )}
-
-          {/* Assignee avatars */}
-          <div className="flex -space-x-1">
-            {issue.assignee_details?.slice(0, 3).map((member) => (
-              member.avatar ? (
-                <img
-                  key={member.id}
-                  src={member.avatar}
-                  alt={member.display_name}
-                  title={member.display_name}
-                  className="w-5 h-5 rounded-full border"
-                  style={{ borderColor: "var(--plane-bg)" }}
-                />
-              ) : (
-                <div
-                  key={member.id}
-                  title={member.display_name}
-                  className="w-5 h-5 rounded-full border flex items-center justify-center text-[9px] font-bold"
-                  style={{
-                    borderColor: "var(--plane-bg)",
-                    backgroundColor: "var(--plane-accent)",
-                    color: "#fff",
-                  }}
-                >
-                  {member.display_name.charAt(0).toUpperCase()}
-                </div>
-              )
-            ))}
-          </div>
-        </div>
+      {/* Footer: due date */}
+      <div className="flex items-center justify-end gap-2 shrink-0">
+        {issue.target_date && (
+          <span
+            className="text-[10px]"
+            style={{
+              color: overdueTarget ? "#ef4444" : "var(--plane-text-muted)",
+            }}
+          >
+            {formatDate(issue.target_date)}
+          </span>
+        )}
       </div>
     </div>
   );
