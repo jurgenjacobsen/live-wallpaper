@@ -10,13 +10,6 @@
     --plane-text-muted: #6b7280;
     --plane-text-secondary: #4b5563;
     --plane-accent: #2563eb;
-
-    /* Priority colours */
-    --priority-urgent: #ef4444;
-    --priority-high: #f97316;
-    --priority-medium: #eab308;
-    --priority-low: #3b82f6;
-    --priority-none: #64748b;
   }
 
   *, *::before, *::after {

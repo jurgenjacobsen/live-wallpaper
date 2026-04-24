@@ -73,13 +73,6 @@ export interface PlaneCycle {
   project: string;
 }
 
-export interface PaginatedResponse<T> {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: T[];
-}
-
 /** Issues grouped for the Kanban board */
 export interface GroupedIssues {
   todo: PlaneIssue[];

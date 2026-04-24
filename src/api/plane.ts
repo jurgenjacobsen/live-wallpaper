@@ -1,5 +1,4 @@
 import type {
-  PlaneWorkspace,
   PlaneProject,
   PlaneState,
   PlaneIssue,
@@ -10,8 +9,8 @@ import type {
 
 const BASE_URL = "/plane-api";
 
-export type RuntimeProvider = "none" | "plane" | "weather";
-export type WeatherCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
+type RuntimeProvider = "none" | "plane" | "weather";
+type WeatherCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface RuntimeConfig {
   selectedProvider: RuntimeProvider;
@@ -101,12 +100,6 @@ async function planeFetch<T>(path: string): Promise<T> {
   }
 
   return res.json() as Promise<T>;
-}
-
-export async function fetchWorkspaces(): Promise<PlaneWorkspace[]> {
-  const path = "/api/v1/workspaces/";
-  const data = await planeFetch<unknown>(path);
-  return parseListResponse<PlaneWorkspace>(data, path);
 }
 
 export async function fetchProjects(workspaceSlug: string): Promise<PlaneProject[]> {

@@ -21,7 +21,6 @@ import {
 
 interface UsePlaneDataReturn {
   groupedIssues: GroupedIssues;
-  states: PlaneState[];
   projectName: string;
   loading: boolean;
   error: string | null;
@@ -51,7 +50,7 @@ async function resolveProject(
 
   if (!match) {
     throw new Error(
-      `Project \"${inputProject}\" not found in workspace \"${workspaceSlug}\". Available project identifiers: ${previewList(
+      `Project "${inputProject}" not found in workspace "${workspaceSlug}". Available project identifiers: ${previewList(
         projects.map((p) => p.identifier)
       )}`
     );
@@ -170,7 +169,6 @@ export function usePlaneData(): UsePlaneDataReturn {
     inProgress: [],
     done: [],
   });
-  const [states, setStates] = useState<PlaneState[]>([]);
   const [projectName, setProjectName] = useState("Project");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -211,8 +209,6 @@ export function usePlaneData(): UsePlaneDataReturn {
         ]);
 
         if (cancelled) return;
-
-        setStates(fetchedStates);
 
         let issues: PlaneIssue[];
 
@@ -259,7 +255,6 @@ export function usePlaneData(): UsePlaneDataReturn {
 
   return {
     groupedIssues,
-    states,
     projectName,
     loading,
     error,
