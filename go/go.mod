@@ -7,6 +7,7 @@ require (
 	github.com/chromedp/chromedp v0.15.1
 	github.com/getlantern/systray v1.2.2
 	golang.org/x/image v0.32.0
+	golang.org/x/sys v0.42.0
 )
 
 require (
@@ -24,5 +25,4 @@ require (
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
-	golang.org/x/sys v0.42.0 // indirect
 )

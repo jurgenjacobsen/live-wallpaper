@@ -8,7 +8,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 )
@@ -184,7 +184,7 @@ func fetchWeatherForecast(ctx context.Context, apiKey, city string) (weatherFore
 		})
 	}
 
-	sort.Strings(dateOrder)
+	slices.Sort(dateOrder)
 	days := make([]weatherDayColumn, 0, 5)
 	for _, dateKey := range dateOrder {
 		agg := aggregates[dateKey]
@@ -250,8 +250,5 @@ func weatherIconURL(entry openWeatherEntry) string {
 }
 
 func rounded(v float64) int {
-	if v >= 0 {
-		return int(v + 0.5)
-	}
-	return int(v - 0.5)
+	return int(math.Round(v))
 }

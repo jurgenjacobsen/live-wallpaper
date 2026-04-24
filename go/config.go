@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 	"strings"
 )
 
@@ -191,8 +190,8 @@ func (c appConfig) normalized() appConfig {
 		set[assignment.MonitorIndex] = struct{}{}
 		assignments = append(assignments, assignment)
 	}
-	sort.Slice(assignments, func(i, j int) bool {
-		return assignments[i].MonitorIndex < assignments[j].MonitorIndex
+	slices.SortFunc(assignments, func(a, b monitorProviderAssignment) int {
+		return a.MonitorIndex - b.MonitorIndex
 	})
 	clone.MonitorAssignments = assignments
 

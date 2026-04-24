@@ -66,7 +66,7 @@ function ErrorState({ message }: { message: string }) {
 }
 
 export function KanbanBoard({ onInitialDataReady }: KanbanBoardProps) {
-  const { groupedIssues, states, projectName, loading, error, lastUpdated } = usePlaneData();
+  const { groupedIssues, projectName, loading, error, lastUpdated } = usePlaneData();
   const notifiedRef = useRef(false);
 
   useEffect(() => {
@@ -161,7 +161,6 @@ export function KanbanBoard({ onInitialDataReady }: KanbanBoardProps) {
               title={col.title}
               issues={groupedIssues[col.key]}
               accentColor={col.accentColor}
-              states={states}
               columnGroup={col.key}
             />
           ))}

@@ -147,6 +147,31 @@ func main() {
 		})
 	}
 
+	captureAndApplyForAssignment := func(assignment monitorProviderAssignment) bool {
+		readyState.Reset(assignment.Provider, assignment.MonitorIndex)
+
+		width, height, sizeErr := monitorSize(assignment.MonitorIndex)
+		if sizeErr != nil {
+			log.Printf("[live-wallpaper] monitor size lookup failed for monitor %d, using fallback 1920x1080: %v", assignment.MonitorIndex, sizeErr)
+			width = 1920
+			height = 1080
+		}
+
+		wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d-%s.png", assignment.MonitorIndex, assignment.Provider))
+		if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height, readyState); captureErr != nil {
+			if ctx.Err() != nil {
+				return false
+			}
+			log.Printf("[live-wallpaper] screenshot failed for monitor %d (%s): %v", assignment.MonitorIndex, assignment.Provider, captureErr)
+			return true
+		}
+
+		if wpErr := setWallpaper(wallpaperPath, []int{assignment.MonitorIndex}); wpErr != nil {
+			log.Printf("[live-wallpaper] set wallpaper failed for monitor %d (%s): %v", assignment.MonitorIndex, assignment.Provider, wpErr)
+		}
+		return true
+	}
+
 	runUpdate := func(reason string) {
 		updateMu.Lock()
 		defer updateMu.Unlock()
@@ -161,29 +186,9 @@ func main() {
 			if assignment.Provider == providerNone {
 				continue
 			}
-
-			readyState.Reset(assignment.Provider, assignment.MonitorIndex)
-
-			width, height, sizeErr := monitorSize(assignment.MonitorIndex)
-			if sizeErr != nil {
-				log.Printf("[live-wallpaper] monitor size lookup failed for monitor %d, using fallback 1920x1080: %v", assignment.MonitorIndex, sizeErr)
-				width = 1920
-				height = 1080
-			}
-
-			wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d-%s.png", assignment.MonitorIndex, assignment.Provider))
-			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height, readyState); captureErr != nil {
-				if ctx.Err() != nil {
-					log.Printf("[live-wallpaper] update canceled during shutdown")
-					return
-				}
-				log.Printf("[live-wallpaper] screenshot failed for monitor %d (%s): %v", assignment.MonitorIndex, assignment.Provider, captureErr)
-				continue
-			}
-
-			if wpErr := setWallpaper(wallpaperPath, []int{assignment.MonitorIndex}); wpErr != nil {
-				log.Printf("[live-wallpaper] set wallpaper failed for monitor %d (%s): %v", assignment.MonitorIndex, assignment.Provider, wpErr)
-				continue
+			if !captureAndApplyForAssignment(assignment) {
+				log.Printf("[live-wallpaper] update canceled during shutdown")
+				return
 			}
 		}
 
@@ -204,29 +209,9 @@ func main() {
 			if assignment.Provider != provider {
 				continue
 			}
-
-			readyState.Reset(assignment.Provider, assignment.MonitorIndex)
-
-			width, height, sizeErr := monitorSize(assignment.MonitorIndex)
-			if sizeErr != nil {
-				log.Printf("[live-wallpaper] monitor size lookup failed for monitor %d, using fallback 1920x1080: %v", assignment.MonitorIndex, sizeErr)
-				width = 1920
-				height = 1080
-			}
-
-			wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d-%s.png", assignment.MonitorIndex, assignment.Provider))
-			if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height, readyState); captureErr != nil {
-				if ctx.Err() != nil {
-					log.Printf("[live-wallpaper] update canceled during shutdown")
-					return
-				}
-				log.Printf("[live-wallpaper] screenshot failed for monitor %d (%s): %v", assignment.MonitorIndex, assignment.Provider, captureErr)
-				continue
-			}
-
-			if wpErr := setWallpaper(wallpaperPath, []int{assignment.MonitorIndex}); wpErr != nil {
-				log.Printf("[live-wallpaper] set wallpaper failed for monitor %d (%s): %v", assignment.MonitorIndex, assignment.Provider, wpErr)
-				continue
+			if !captureAndApplyForAssignment(assignment) {
+				log.Printf("[live-wallpaper] update canceled during shutdown")
+				return
 			}
 		}
 

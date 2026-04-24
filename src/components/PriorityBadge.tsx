@@ -28,7 +28,7 @@ export function PriorityBadge({ priority }: PriorityBadgeProps) {
       }}
     >
     <span>{cfg.icon}</span>
-      {cfg.label.charAt(0).toUpperCase() + cfg.label.slice(1).toLowerCase()}
+      {cfg.label}
     </span>
   );
 }

@@ -1,11 +1,10 @@
-import type { PlaneIssue, PlaneState } from "../types/plane";
+import type { PlaneIssue } from "../types/plane";
 import { IssueCard } from "./IssueCard";
 
 interface KanbanColumnProps {
   title: string;
   issues: PlaneIssue[];
   accentColor: string;
-  states: PlaneState[];
   columnGroup: "todo" | "inProgress" | "done";
 }
 
