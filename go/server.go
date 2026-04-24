@@ -119,6 +119,8 @@ func newHandler(cfg appConfig, readyState *frontendReadyState) http.Handler {
 			return
 		}
 
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		http.ServeFile(w, r, path)
 	})
 

@@ -62,6 +62,8 @@ export function WeatherWallpaper({ runtimeConfig, onInitialDataReady }: WeatherW
           : "linear-gradient(135deg, #0f172a, #1e3a8a)",
         backgroundSize: "cover",
         backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundAttachment: "fixed",
       }}
     >
       <div
@@ -100,12 +102,20 @@ export function WeatherWallpaper({ runtimeConfig, onInitialDataReady }: WeatherW
                   Last updated on {formatUpdatedAtLabel(weather.updatedAt)}
                 </p>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "34px", lineHeight: 1, fontWeight: 700 }}>{weather.current.tempC}°C</div>
-                <p style={{ margin: "8px 0 0", fontSize: "12px", color: "#cbd5e1" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ fontSize: "34px", lineHeight: 1, fontWeight: 700 }}>{weather.current.tempC}°C</div>
+                  {weather.current.iconUrl ? (
+                    <img
+                      src={weather.current.iconUrl}
+                      alt={weather.current.condition}
+                      style={{ width: "48px", height: "48px", objectFit: "contain" }}
+                    />
+                  ) : null}
+                </div>
+                <p style={{ margin: 0, fontSize: "12px", color: "#cbd5e1" }}>
                   Humidity {weather.current.humidity}% | Wind {weather.current.windKph} km/h
                 </p>
-                
               </div>
             </div>
 
