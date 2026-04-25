@@ -34,26 +34,31 @@ func main() {
 	}
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
 
-	cfg, err := ensureAppConfig(exeDir)
+	// Start the embedded HTTP server on a random loopback port.
+	// We do this EARLY because the setup/settings page might need to be served.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
-		log.Fatalf("[live-wallpaper] setup/config failed: %v", err)
+		log.Fatalf("[live-wallpaper] failed to start listener: %v", err)
 	}
-	if err := applyRunOnStartupSetting(exePath, cfg.RunOnStartup); err != nil {
-		log.Printf("[live-wallpaper] run-on-startup sync failed: %v", err)
-	}
+	port := ln.Addr().(*net.TCPAddr).Port
+	serverURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+	readyState := newFrontendReadyState()
 
-	closeSplash := func() {}
-	splashCloser, splashErr := showSplashWindow()
-	if splashErr != nil {
-		log.Printf("[live-wallpaper] splash window unavailable: %v", splashErr)
-	} else {
-		closeSplash = splashCloser
-	}
-	defer closeSplash()
+	appArgs := append([]string(nil), os.Args[1:]...)
+	configPath := filepath.Join(exeDir, appConfigFileName)
 
-	log.Printf("[live-wallpaper] targeting %s", cfg.displayMonitorSelection())
-	log.Printf("[live-wallpaper] plane interval: every %d minute(s)", cfg.PlaneUpdateIntervalMinutes)
-	log.Printf("[live-wallpaper] weather interval: every %d minute(s)", cfg.WeatherUpdateIntervalMinutes)
+	// Initial placeholder config; will be updated by ensureAppConfig or API.
+	cfg := appConfig{}
+	globalSaveConfigCh := make(chan appConfig, 1)
+	globalSettingsClosedCh := make(chan struct{}, 1)
+
+	srv := &http.Server{Handler: newHandler(&cfg, configPath, readyState, globalSaveConfigCh, globalSettingsClosedCh)}
+	go func() {
+		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
+			log.Printf("[live-wallpaper] HTTP server error: %v", serveErr)
+		}
+	}()
+	log.Printf("[live-wallpaper] serving React app at %s", serverURL)
 
 	checkForUpdates := func(trigger string) {
 		updateCtx, updateCancel := context.WithTimeout(context.Background(), 8*time.Second)
@@ -90,25 +95,26 @@ func main() {
 		checkForUpdates("startup")
 	}()
 
-	// Start the embedded HTTP server on a random loopback port.
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	cfg, err = ensureAppConfig(exeDir, serverURL, globalSaveConfigCh, globalSettingsClosedCh)
 	if err != nil {
-		log.Fatalf("[live-wallpaper] failed to start listener: %v", err)
+		log.Fatalf("[live-wallpaper] setup/config failed: %v", err)
 	}
-	port := ln.Addr().(*net.TCPAddr).Port
-	serverURL := fmt.Sprintf("http://127.0.0.1:%d", port)
-	readyState := newFrontendReadyState()
+	if err := applyRunOnStartupSetting(exePath, cfg.RunOnStartup); err != nil {
+		log.Printf("[live-wallpaper] run-on-startup sync failed: %v", err)
+	}
 
-	srv := &http.Server{Handler: newHandler(cfg, readyState)}
-	go func() {
-		if serveErr := srv.Serve(ln); serveErr != nil && serveErr != http.ErrServerClosed {
-			log.Printf("[live-wallpaper] HTTP server error: %v", serveErr)
-		}
-	}()
-	log.Printf("[live-wallpaper] serving React app at %s", serverURL)
+	closeSplash := func() {}
+	splashCloser, splashErr := showSplashWindow()
+	if splashErr != nil {
+		log.Printf("[live-wallpaper] splash window unavailable: %v", splashErr)
+	} else {
+		closeSplash = splashCloser
+	}
+	defer closeSplash()
 
-	appArgs := append([]string(nil), os.Args[1:]...)
-	configPath := filepath.Join(exeDir, appConfigFileName)
+	log.Printf("[live-wallpaper] targeting %s", cfg.displayMonitorSelection())
+	log.Printf("[live-wallpaper] plane interval: every %d minute(s)", cfg.PlaneUpdateIntervalMinutes)
+	log.Printf("[live-wallpaper] weather interval: every %d minute(s)", cfg.WeatherUpdateIntervalMinutes)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -274,7 +280,7 @@ func main() {
 		trayErr := runTray(trayCallbacks{
 			OpenSettings: func() {
 				go func() {
-					if err := openSetupFromTray(configPath); err != nil {
+					if err := openSetupFromTray(configPath, serverURL, globalSaveConfigCh, globalSettingsClosedCh); err != nil {
 						log.Printf("[live-wallpaper] open settings failed: %v", err)
 					}
 				}()

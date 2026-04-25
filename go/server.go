@@ -24,7 +24,7 @@ var distFS embed.FS
 //   - Exposes weather forecast payload under /api/weather-forecast
 //   - Exposes weather background image under /api/weather-background
 //   - Serves the embedded React production build for all other paths
-func newHandler(cfg appConfig, readyState *frontendReadyState) http.Handler {
+func newHandler(cfg *appConfig, configPath string, readyState *frontendReadyState, saveConfigCh chan<- appConfig, settingsClosedCh chan<- struct{}) http.Handler {
 	sub, err := fs.Sub(distFS, "dist")
 	if err != nil {
 		panic("embedded dist/ directory not found: " + err.Error())
@@ -43,6 +43,21 @@ func newHandler(cfg appConfig, readyState *frontendReadyState) http.Handler {
 	}
 
 	mux := http.NewServeMux()
+
+	mux.HandleFunc("/api/settings-closed", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if settingsClosedCh != nil {
+			select {
+			case settingsClosedCh <- struct{}{}:
+			default:
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	mux.HandleFunc("/api/frontend-ready", func(w http.ResponseWriter, r *http.Request) {
 		providerRaw := strings.TrimSpace(r.URL.Query().Get("provider"))
 		monitorRaw := strings.TrimSpace(r.URL.Query().Get("monitor"))
@@ -77,7 +92,7 @@ func newHandler(cfg appConfig, readyState *frontendReadyState) http.Handler {
 	})
 
 	mux.HandleFunc("/api/runtime-config", func(w http.ResponseWriter, r *http.Request) {
-		provider, monitorIndex := resolveRuntimeSelection(r, cfg)
+		provider, monitorIndex := resolveRuntimeSelection(r, *cfg)
 		weatherBackgroundImageURL := ""
 		if strings.TrimSpace(cfg.Weather.BackgroundImagePath) != "" {
 			weatherBackgroundImageURL = "/api/weather-background"
@@ -85,6 +100,55 @@ func newHandler(cfg appConfig, readyState *frontendReadyState) http.Handler {
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(cfg.toRuntimeClientConfig(provider, monitorIndex, weatherBackgroundImageURL))
+	})
+
+	mux.HandleFunc("/api/full-config", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(cfg)
+			return
+		}
+
+		if r.Method == http.MethodPost {
+			var newCfg appConfig
+			if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
+				http.Error(w, "invalid config payload", http.StatusBadRequest)
+				return
+			}
+
+			newCfg = newCfg.normalized()
+			if err := newCfg.validate(); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			if err := saveAppConfig(configPath, newCfg); err != nil {
+				http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			*cfg = newCfg
+			if saveConfigCh != nil {
+				select {
+				case saveConfigCh <- newCfg:
+				default:
+				}
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+
+	mux.HandleFunc("/api/monitors", func(w http.ResponseWriter, r *http.Request) {
+		monitors, err := listMonitorIndexes()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(monitors)
 	})
 
 	mux.HandleFunc("/api/weather-forecast", func(w http.ResponseWriter, r *http.Request) {

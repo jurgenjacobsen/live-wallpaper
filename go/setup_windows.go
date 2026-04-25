@@ -4,7 +4,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -22,6 +24,48 @@ func openBrowser(url string) error {
 		return fmt.Errorf("open browser: %w", err)
 	}
 	return nil
+}
+
+func openSettingsWindow(url string) error {
+	// Append mode=settings to the URL
+	if strings.Contains(url, "?") {
+		url += "&mode=settings"
+	} else {
+		url += "?mode=settings"
+	}
+
+	// Try Microsoft Edge in "app" mode first for a native window feel.
+	edgePaths := []string{
+		os.Getenv("ProgramFiles(x86)") + `\Microsoft\Edge\Application\msedge.exe`,
+		os.Getenv("ProgramFiles") + `\Microsoft\Edge\Application\msedge.exe`,
+		"msedge.exe",
+	}
+	for _, p := range edgePaths {
+		if _, err := os.Stat(p); err == nil || p == "msedge.exe" {
+			cmd := exec.Command(p, "--app="+url)
+			if err := cmd.Start(); err == nil {
+				return nil
+			}
+		}
+	}
+
+	// Fallback to Google Chrome in "app" mode.
+	chromePaths := []string{
+		os.Getenv("ProgramFiles(x86)") + `\Google\Chrome\Application\chrome.exe`,
+		os.Getenv("ProgramFiles") + `\Google\Chrome\Application\chrome.exe`,
+		"chrome.exe",
+	}
+	for _, p := range chromePaths {
+		if _, err := os.Stat(p); err == nil || p == "chrome.exe" {
+			cmd := exec.Command(p, "--app="+url)
+			if err := cmd.Start(); err == nil {
+				return nil
+			}
+		}
+	}
+
+	// Absolute fallback to the default browser.
+	return openBrowser(url)
 }
 
 func openLogFile(path string) error {

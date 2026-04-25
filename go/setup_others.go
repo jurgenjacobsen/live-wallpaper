@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 )
 
 func openBrowser(url string) error {
@@ -17,6 +18,15 @@ func openBrowser(url string) error {
 		return nil
 	}
 	return fmt.Errorf("could not open browser automatically")
+}
+
+func openSettingsWindow(url string) error {
+	if strings.Contains(url, "?") {
+		url += "&mode=settings"
+	} else {
+		url += "?mode=settings"
+	}
+	return openBrowser(url)
 }
 
 func openLogFile(path string) error {

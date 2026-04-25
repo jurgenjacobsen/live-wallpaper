@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getRuntimeConfig, type RuntimeConfig } from './api/plane'
 import { WeatherWallpaper } from './components/WeatherWallpaper'
 import { KanbanBoard } from './components/KanbanBoard'
+import { Settings } from './components/Settings'
 
 /**
  * Root application layout for a monitor-sized wallpaper viewport.
@@ -13,6 +14,9 @@ function App() {
   const [error, setError] = useState<string | null>(null)
   const [providerDataReady, setProviderDataReady] = useState(false)
   const readyNotifiedRef = useRef(false)
+
+  const params = new URLSearchParams(window.location.search)
+  const isSettingsMode = params.get('mode') === 'settings'
 
   const handleProviderReady = () => {
     setProviderDataReady(true)
@@ -100,10 +104,18 @@ function App() {
   }, [loading, error])
 
   useEffect(() => {
+    document.body.setAttribute('data-mode', isSettingsMode ? 'settings' : 'wallpaper')
+  }, [isSettingsMode])
+
+  useEffect(() => {
     document.body.setAttribute('data-app-ready', 'false')
   }, [])
 
   const content = (() => {
+    if (isSettingsMode) {
+      return <Settings />
+    }
+
     if (error) {
       return (
         <div style={{ width: '100vw', height: '100vh', display: 'grid', placeItems: 'center', color: '#ef4444' }}>

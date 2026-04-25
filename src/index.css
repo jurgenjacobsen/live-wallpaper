@@ -30,10 +30,19 @@
     overflow: hidden;
   }
 
+  body[data-mode="settings"] {
+    overflow: auto;
+  }
+
   #root {
     width: 100vw;
     height: 100vh;
     overflow: hidden;
+  }
+
+  body[data-mode="settings"] #root {
+    height: auto;
+    overflow: visible;
   }
 }
 
