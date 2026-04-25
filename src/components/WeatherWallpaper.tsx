@@ -44,11 +44,13 @@ export function WeatherWallpaper({ runtimeConfig, onInitialDataReady }: WeatherW
   const notifiedRef = useRef(false);
 
   useEffect(() => {
-    if (!loading && !notifiedRef.current) {
-      notifiedRef.current = true;
+  if (!loading && weather && !notifiedRef.current) {
+    notifiedRef.current = true;
+    setTimeout(() => {
       onInitialDataReady?.();
-    }
-  }, [loading, onInitialDataReady]);
+    }, 500); 
+  }
+}, [loading, weather, onInitialDataReady]);
 
   return (
     <div

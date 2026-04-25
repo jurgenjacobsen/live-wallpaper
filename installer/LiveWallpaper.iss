@@ -1,6 +1,9 @@
 ; Inno Setup script for Live Wallpaper
 ; Build with: ISCC installer\LiveWallpaper.iss
 
+#ifndef MySourceIcon
+  #define MySourceIcon "..\go\assets\icon.ico"
+#endif
 #define MyAppName "Live Wallpaper"
 #ifndef MyAppVersion
   #define MyAppVersion "0.1.0"
@@ -35,6 +38,8 @@ ArchitecturesInstallIn64BitMode=x64compatible
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 DisableProgramGroupPage=yes
+SetupIconFile={#MySourceIcon}
+UninstallDisplayIcon={app}\{#MyAppName}.exe
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -46,8 +51,8 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 Source: "{#MySourceExe}"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\Live Wallpaper.exe"
-Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\Live Wallpaper.exe"; Tasks: desktopicon
+Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\Live Wallpaper.exe"; IconFilename: "{app}\Live Wallpaper.exe"
+Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\Live Wallpaper.exe"; Tasks: desktopicon; IconFilename: "{app}\Live Wallpaper.exe"
 
 [Run]
 Filename: "{app}\Live Wallpaper.exe"; Description: "Launch {#MyAppName}"; Flags: nowait postinstall skipifsilent
