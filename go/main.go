@@ -130,6 +130,11 @@ func main() {
 			if assignment.Provider == provider {
 				return true
 			}
+			for _, w := range assignment.Widgets {
+				if w == provider {
+					return true
+				}
+			}
 		}
 		return false
 	}
@@ -154,7 +159,12 @@ func main() {
 	}
 
 	captureAndApplyForAssignment := func(assignment monitorProviderAssignment) bool {
-		readyState.Reset(assignment.Provider, assignment.MonitorIndex)
+		// We wait for the first non-none provider as signaled by the frontend
+		waitProvider := assignment.Provider
+		if waitProvider == providerNone && len(assignment.Widgets) > 0 {
+			waitProvider = assignment.Widgets[0]
+		}
+		readyState.Reset(waitProvider, assignment.MonitorIndex)
 
 		width, height, sizeErr := monitorSize(assignment.MonitorIndex)
 		if sizeErr != nil {
@@ -163,17 +173,17 @@ func main() {
 			height = 1080
 		}
 
-		wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d-%s.png", assignment.MonitorIndex, assignment.Provider))
-		if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, assignment.Provider, assignment.MonitorIndex, width, height, readyState); captureErr != nil {
+		wallpaperPath := filepath.Join(exeDir, fmt.Sprintf("wallpaper-monitor-%d.png", assignment.MonitorIndex))
+		if captureErr := captureWallpaper(ctx, serverURL, wallpaperPath, waitProvider, assignment.MonitorIndex, width, height, readyState); captureErr != nil {
 			if ctx.Err() != nil {
 				return false
 			}
-			log.Printf("[live-wallpaper] screenshot failed for monitor %d (%s): %v", assignment.MonitorIndex, assignment.Provider, captureErr)
+			log.Printf("[live-wallpaper] screenshot failed for monitor %d: %v", assignment.MonitorIndex, captureErr)
 			return true
 		}
 
 		if wpErr := setWallpaper(wallpaperPath, []int{assignment.MonitorIndex}); wpErr != nil {
-			log.Printf("[live-wallpaper] set wallpaper failed for monitor %d (%s): %v", assignment.MonitorIndex, assignment.Provider, wpErr)
+			log.Printf("[live-wallpaper] set wallpaper failed for monitor %d: %v", assignment.MonitorIndex, wpErr)
 		}
 		return true
 	}
@@ -189,7 +199,7 @@ func main() {
 		log.Printf("[live-wallpaper] updating wallpaper at %s (%s)", time.Now().Format(time.RFC3339), reason)
 
 		for _, assignment := range cfg.MonitorAssignments {
-			if assignment.Provider == providerNone {
+			if assignment.Provider == providerNone && len(assignment.Widgets) == 0 {
 				continue
 			}
 			if !captureAndApplyForAssignment(assignment) {
@@ -209,10 +219,19 @@ func main() {
 		updateMu.Lock()
 		defer updateMu.Unlock()
 
-		log.Printf("[live-wallpaper] updating %s wallpaper at %s (%s)", provider, time.Now().Format(time.RFC3339), reason)
+		log.Printf("[live-wallpaper] updating monitors with %s at %s (%s)", provider, time.Now().Format(time.RFC3339), reason)
 
 		for _, assignment := range cfg.MonitorAssignments {
-			if assignment.Provider != provider {
+			isAssigned := assignment.Provider == provider
+			if !isAssigned {
+				for _, w := range assignment.Widgets {
+					if w == provider {
+						isAssigned = true
+						break
+					}
+				}
+			}
+			if !isAssigned {
 				continue
 			}
 			if !captureAndApplyForAssignment(assignment) {
@@ -221,7 +240,7 @@ func main() {
 			}
 		}
 
-		log.Printf("[live-wallpaper] ✓ %s wallpaper updated successfully", provider)
+		log.Printf("[live-wallpaper] ✓ %s related monitors updated successfully", provider)
 	}
 
 	var workers sync.WaitGroup

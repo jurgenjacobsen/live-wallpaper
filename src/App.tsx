@@ -1,7 +1,7 @@
 import './index.css'
 import { useEffect, useRef, useState } from 'react'
 import { getRuntimeConfig, type RuntimeConfig } from './api/plane'
-import { WeatherWallpaper } from './components/WeatherWallpaper'
+import { WidgetWallpaper } from './components/WidgetWallpaper'
 import { KanbanBoard } from './components/KanbanBoard'
 import { Settings } from './components/Settings'
 
@@ -22,9 +22,11 @@ function App() {
     setProviderDataReady(true)
   }
 
-  const notifyFrontendReady = (provider: RuntimeConfig['selectedProvider'], monitor: number) => {
+  const notifyFrontendReady = (providers: RuntimeConfig['providers'], monitor: number) => {
+    // We notify for the first provider that isn't 'none', or just 'none' if that's all there is
+    const primaryProvider = providers.find(p => p !== 'none') || 'none'
     const params = new URLSearchParams({
-      provider,
+      provider: primaryProvider,
       monitor: String(monitor),
     })
 
@@ -69,7 +71,7 @@ function App() {
       return
     }
 
-    if (runtimeConfig.selectedProvider === 'none') {
+    if (runtimeConfig.providers.every(p => p === 'none')) {
       setProviderDataReady(true)
     }
   }, [loading, error, runtimeConfig])
@@ -82,7 +84,7 @@ function App() {
     readyNotifiedRef.current = true
     document.body.setAttribute('data-app-ready', 'true')
 
-    notifyFrontendReady(runtimeConfig.selectedProvider, runtimeConfig.monitorIndex)
+    notifyFrontendReady(runtimeConfig.providers, runtimeConfig.monitorIndex)
   }, [loading, providerDataReady, runtimeConfig])
 
   useEffect(() => {
@@ -93,13 +95,13 @@ function App() {
     readyNotifiedRef.current = true
     const params = new URLSearchParams(window.location.search)
     const providerParam = params.get('provider')
-    const provider: RuntimeConfig['selectedProvider'] =
-      providerParam === 'weather' || providerParam === 'plane' || providerParam === 'none'
-        ? providerParam
+    const provider: RuntimeConfig['providers'][0] =
+      providerParam === 'weather' || providerParam === 'plane' || providerParam === 'none' || providerParam === 'currency'
+        ? (providerParam as any)
         : 'plane'
     const monitor = Number.parseInt(params.get('monitor') ?? '0', 10)
 
-    notifyFrontendReady(provider, Number.isFinite(monitor) && monitor >= 0 ? monitor : 0)
+    notifyFrontendReady([provider], Number.isFinite(monitor) && monitor >= 0 ? monitor : 0)
     document.body.setAttribute('data-app-ready', 'true')
   }, [loading, error])
 
@@ -124,23 +126,9 @@ function App() {
       )
     }
 
-    if (runtimeConfig?.selectedProvider === 'weather') {
-      return <WeatherWallpaper runtimeConfig={runtimeConfig} onInitialDataReady={handleProviderReady} />
-    }
+    if (!runtimeConfig) return null
 
-    if (runtimeConfig?.selectedProvider === 'none') {
-      return (
-        <div
-          style={{
-            width: '100vw',
-            height: '100vh',
-            background: 'linear-gradient(135deg, #0b1220, #111827)',
-          }}
-        />
-      )
-    }
-
-    if (runtimeConfig?.selectedProvider === 'plane') {
+    if (runtimeConfig.providers.includes('plane')) {
       return (
         <div
           style={{
@@ -169,7 +157,19 @@ function App() {
       )
     }
 
-    return <div style={{ width: '100vw', height: '100vh', background: '#0f172a' }} />
+    if (runtimeConfig.providers.includes('weather') || runtimeConfig.providers.includes('currency')) {
+      return <WidgetWallpaper runtimeConfig={runtimeConfig} onInitialDataReady={handleProviderReady} />
+    }
+
+    return (
+      <div
+        style={{
+          width: '100vw',
+          height: '100vh',
+          background: 'linear-gradient(135deg, #0b1220, #111827)',
+        }}
+      />
+    )
   })()
 
   return content

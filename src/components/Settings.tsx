@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 
 interface MonitorAssignment {
   monitorIndex: number
-  provider: 'none' | 'plane' | 'weather'
+  provider: 'none' | 'plane' | 'weather' | 'currency'
+  widgets: ('weather' | 'currency')[]
 }
 
 interface FullConfig {
@@ -20,6 +21,10 @@ interface FullConfig {
     corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
     backgroundImagePath: string
   }
+  currency: {
+    baseCurrency: string
+    targets: string[]
+  }
   monitorAssignments: MonitorAssignment[]
 }
 
@@ -30,6 +35,7 @@ export function Settings() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [targetsInput, setTargetsInput] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -41,11 +47,12 @@ export function Settings() {
         
         if (!configRes.ok || !monitorsRes.ok) throw new Error('Failed to load settings')
         
-        const configData = await configRes.json()
+        const configData = (await configRes.json()) as FullConfig
         const monitorsData = await monitorsRes.json()
         
         setConfig(configData)
         setMonitors(monitorsData)
+        setTargetsInput(configData.currency.targets.join(', '))
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -55,8 +62,6 @@ export function Settings() {
     load()
 
     const handleUnload = () => {
-      // Notify backend that the settings window is closing so it can release the lock.
-      // Use sendBeacon for reliability during unload.
       navigator.sendBeacon('/api/settings-closed')
     }
     window.addEventListener('beforeunload', handleUnload)
@@ -128,7 +133,7 @@ export function Settings() {
           </section>
 
           <section className="space-y-4">
-            <h2 className="text-xl font-semibold border-b border-slate-800 pb-2 text-sky-400">Plane Provider</h2>
+            <h2 className="text-xl font-semibold border-b border-slate-800 pb-2 text-sky-400">Plane.so Provider</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-sm font-medium text-slate-400">Update Interval (min)</label>
@@ -216,31 +221,113 @@ export function Settings() {
           </section>
 
           <section className="space-y-4">
+            <h2 className="text-xl font-semibold border-b border-slate-800 pb-2 text-emerald-400">Currency Provider</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-400">Base Currency</label>
+                <input 
+                  type="text" 
+                  value={config.currency.baseCurrency}
+                  onChange={e => setConfig({...config, currency: {...config.currency, baseCurrency: e.target.value.toUpperCase()}})}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  placeholder="e.g. USD"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-400">Target Currencies (comma separated)</label>
+                <input 
+                  type="text" 
+                  value={targetsInput}
+                  onChange={e => {
+                    setTargetsInput(e.target.value)
+                    if (config) {
+                      const targets = e.target.value.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+                      setConfig({...config, currency: {...config.currency, targets}})
+                    }
+                  }}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  placeholder="e.g. EUR, GBP, JPY"
+                />
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
             <h2 className="text-xl font-semibold border-b border-slate-800 pb-2">Monitor Assignments</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {monitors.map(idx => {
-                const assignment = config.monitorAssignments.find(a => a.monitorIndex === idx) || { monitorIndex: idx, provider: 'none' }
+                const assignment = config.monitorAssignments.find(a => a.monitorIndex === idx) || { monitorIndex: idx, provider: 'none', widgets: [] }
                 return (
-                  <div key={idx} className="bg-slate-950/50 border border-slate-800 p-4 rounded-xl space-y-2">
+                  <div key={idx} className="bg-slate-950/50 border border-slate-800 p-4 rounded-xl space-y-4">
                     <div className="text-sm font-semibold text-slate-500 uppercase">Monitor {idx}</div>
-                    <select 
-                      value={assignment.provider}
-                      onChange={e => {
-                        const newAssignments = [...config.monitorAssignments]
-                        const existingIdx = newAssignments.findIndex(a => a.monitorIndex === idx)
-                        if (existingIdx >= 0) {
-                          newAssignments[existingIdx] = { ...newAssignments[existingIdx], provider: e.target.value as any }
-                        } else {
-                          newAssignments.push({ monitorIndex: idx, provider: e.target.value as any })
-                        }
-                        setConfig({...config, monitorAssignments: newAssignments})
-                      }}
-                      className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 outline-none focus:border-slate-500"
-                    >
-                      <option value="none">None</option>
-                      <option value="plane">Plane Board</option>
-                      <option value="weather">Weather</option>
-                    </select>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs font-medium text-slate-500 uppercase">Background / Main</label>
+                      <select 
+                        value={assignment.provider}
+                        onChange={e => {
+                          const newProvider = e.target.value as any
+                          const newAssignments = [...config.monitorAssignments]
+                          const existingIdx = newAssignments.findIndex(a => a.monitorIndex === idx)
+                          
+                          // If Plane is selected, clear extra widgets
+                          const finalWidgets = newProvider === 'plane' ? [] : assignment.widgets
+
+                          if (existingIdx >= 0) {
+                            newAssignments[existingIdx] = { 
+                              ...newAssignments[existingIdx], 
+                              provider: newProvider,
+                              widgets: finalWidgets
+                            }
+                          } else {
+                            newAssignments.push({ 
+                              monitorIndex: idx, 
+                              provider: newProvider, 
+                              widgets: [] 
+                            })
+                          }
+                          setConfig({...config, monitorAssignments: newAssignments})
+                        }}
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 outline-none focus:border-slate-500"
+                      >
+                        <option value="none">None</option>
+                        <option value="plane">Plane Board</option>
+                        <option value="weather">Weather (with background)</option>
+                      </select>
+                    </div>
+
+                    <div className={`space-y-2 transition-opacity ${assignment.provider === 'plane' ? 'opacity-40 pointer-events-none' : ''}`}>
+                      <label className="text-xs font-medium text-slate-500 uppercase">
+                        Additional Widgets {assignment.provider === 'plane' && <span className="text-[10px] lowercase font-normal">(Not available with Plane)</span>}
+                      </label>
+                      <div className="flex flex-col gap-2">
+                        {['weather', 'currency'].map(widget => (
+                          <label key={widget} className="flex items-center gap-2 cursor-pointer group">
+                            <input 
+                              type="checkbox"
+                              disabled={assignment.provider === 'plane'}
+                              checked={assignment.widgets.includes(widget as any)}
+                              onChange={e => {
+                                const newWidgets = e.target.checked 
+                                  ? [...assignment.widgets, widget as any]
+                                  : assignment.widgets.filter(w => w !== widget)
+                                
+                                const newAssignments = [...config.monitorAssignments]
+                                const existingIdx = newAssignments.findIndex(a => a.monitorIndex === idx)
+                                if (existingIdx >= 0) {
+                                  newAssignments[existingIdx] = { ...newAssignments[existingIdx], widgets: newWidgets }
+                                } else {
+                                  newAssignments.push({ monitorIndex: idx, provider: 'none', widgets: newWidgets })
+                                }
+                                setConfig({...config, monitorAssignments: newAssignments})
+                              }}
+                              className="w-4 h-4 rounded border-slate-700 bg-slate-950 text-sky-500 focus:ring-sky-500"
+                            />
+                            <span className="text-sm text-slate-400 group-hover:text-white transition-colors capitalize">{widget}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 )
               })}

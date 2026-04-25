@@ -23,14 +23,7 @@ func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider 
 		return fmt.Errorf("invalid page url: %w", err)
 	}
 
-	switch provider {
-	case providerNone:
-		renderURL.Path = "/"
-	case providerWeather:
-		renderURL.Path = "/weather"
-	default:
-		renderURL.Path = "/plane"
-	}
+	renderURL.Path = "/"
 
 	query := renderURL.Query()
 	query.Set("provider", string(provider))

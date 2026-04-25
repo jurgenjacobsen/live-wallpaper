@@ -19,9 +19,10 @@ const (
 type wallpaperProvider string
 
 const (
-	providerNone    wallpaperProvider = "none"
-	providerPlane   wallpaperProvider = "plane"
-	providerWeather wallpaperProvider = "weather"
+	providerNone     wallpaperProvider = "none"
+	providerPlane    wallpaperProvider = "plane"
+	providerWeather  wallpaperProvider = "weather"
+	providerCurrency wallpaperProvider = "currency"
 )
 
 type weatherWidgetCorner string
@@ -46,9 +47,15 @@ type providerWeatherConfig struct {
 	BackgroundImagePath string              `json:"backgroundImagePath"`
 }
 
+type providerCurrencyConfig struct {
+	BaseCurrency string   `json:"baseCurrency"`
+	Targets      []string `json:"targets"`
+}
+
 type monitorProviderAssignment struct {
-	MonitorIndex int               `json:"monitorIndex"`
-	Provider     wallpaperProvider `json:"provider"`
+	MonitorIndex int                 `json:"monitorIndex"`
+	Provider     wallpaperProvider   `json:"provider"`
+	Widgets      []wallpaperProvider `json:"widgets"`
 }
 
 type appConfig struct {
@@ -59,6 +66,7 @@ type appConfig struct {
 	WeatherUpdateIntervalMinutes int                         `json:"weatherUpdateIntervalMinutes"`
 	Plane                        providerPlaneConfig         `json:"plane"`
 	Weather                      providerWeatherConfig       `json:"weather"`
+	Currency                     providerCurrencyConfig      `json:"currency"`
 	MonitorAssignments           []monitorProviderAssignment `json:"monitorAssignments"`
 	PlaneAPIKeyLegacy            string                      `json:"planeApiKey,omitempty"`
 	WorkspaceSlugLegacy          string                      `json:"workspaceSlug,omitempty"`
@@ -69,16 +77,22 @@ type appConfig struct {
 }
 
 type runtimeClientConfig struct {
-	SelectedProvider wallpaperProvider    `json:"selectedProvider"`
-	MonitorIndex     int                  `json:"monitorIndex"`
-	Plane            providerPlaneConfig  `json:"plane"`
-	Weather          runtimeWeatherConfig `json:"weather"`
+	Providers    []wallpaperProvider   `json:"providers"`
+	MonitorIndex int                   `json:"monitorIndex"`
+	Plane        providerPlaneConfig   `json:"plane"`
+	Weather      runtimeWeatherConfig  `json:"weather"`
+	Currency     runtimeCurrencyConfig `json:"currency"`
 }
 
 type runtimeWeatherConfig struct {
 	City               string              `json:"city"`
 	Corner             weatherWidgetCorner `json:"corner"`
 	BackgroundImageURL string              `json:"backgroundImageUrl"`
+}
+
+type runtimeCurrencyConfig struct {
+	BaseCurrency string   `json:"baseCurrency"`
+	Targets      []string `json:"targets"`
 }
 
 func (c appConfig) validate() error {
@@ -106,14 +120,19 @@ func (c appConfig) validate() error {
 		}
 		seen[idx] = struct{}{}
 
-		switch assignment.Provider {
-		case providerNone:
-		case providerPlane:
-			usesPlane = true
-		case providerWeather:
-			usesWeather = true
-		default:
-			return fmt.Errorf("invalid provider %q for monitor %d", assignment.Provider, idx)
+		providers := append([]wallpaperProvider{assignment.Provider}, assignment.Widgets...)
+		for _, p := range providers {
+			switch p {
+			case providerNone:
+			case providerPlane:
+				usesPlane = true
+			case providerWeather:
+				usesWeather = true
+			case providerCurrency:
+				// Currency is always available if selected
+			default:
+				return fmt.Errorf("invalid provider %q for monitor %d", p, idx)
+			}
 		}
 	}
 
@@ -156,6 +175,13 @@ func (c appConfig) normalized() appConfig {
 	clone.Weather.City = strings.TrimSpace(clone.Weather.City)
 	clone.Weather.BackgroundImagePath = strings.TrimSpace(clone.Weather.BackgroundImagePath)
 
+	if clone.Currency.BaseCurrency == "" {
+		clone.Currency.BaseCurrency = "USD"
+	}
+	if len(clone.Currency.Targets) == 0 {
+		clone.Currency.Targets = []string{"EUR", "GBP", "JPY"}
+	}
+
 	legacyInterval := clone.UpdateIntervalMinutesLegacy
 	if clone.PlaneUpdateIntervalMinutes <= 0 {
 		if legacyInterval > 0 {
@@ -181,9 +207,19 @@ func (c appConfig) normalized() appConfig {
 		if assignment.MonitorIndex < 0 {
 			continue
 		}
-		if assignment.Provider != providerNone && assignment.Provider != providerPlane && assignment.Provider != providerWeather {
-			continue
+		// Validate provider
+		if !isValidProvider(assignment.Provider) {
+			assignment.Provider = providerNone
 		}
+		// Validate widgets
+		validWidgets := make([]wallpaperProvider, 0, len(assignment.Widgets))
+		for _, w := range assignment.Widgets {
+			if isValidProvider(w) && w != providerNone {
+				validWidgets = append(validWidgets, w)
+			}
+		}
+		assignment.Widgets = validWidgets
+
 		if _, exists := set[assignment.MonitorIndex]; exists {
 			continue
 		}
@@ -219,6 +255,7 @@ func (c appConfig) migrateLegacyIfNeeded() appConfig {
 			clone.MonitorAssignments = []monitorProviderAssignment{{
 				MonitorIndex: 0,
 				Provider:     providerNone,
+				Widgets:      []wallpaperProvider{},
 			}}
 		} else if len(clone.MonitorIndexesLegacy) > 0 {
 			clone.MonitorAssignments = make([]monitorProviderAssignment, 0, len(clone.MonitorIndexesLegacy))
@@ -226,6 +263,7 @@ func (c appConfig) migrateLegacyIfNeeded() appConfig {
 				clone.MonitorAssignments = append(clone.MonitorAssignments, monitorProviderAssignment{
 					MonitorIndex: idx,
 					Provider:     providerNone,
+					Widgets:      []wallpaperProvider{},
 				})
 			}
 		}
@@ -235,6 +273,7 @@ func (c appConfig) migrateLegacyIfNeeded() appConfig {
 		clone.MonitorAssignments = []monitorProviderAssignment{{
 			MonitorIndex: 0,
 			Provider:     providerNone,
+			Widgets:      []wallpaperProvider{},
 		}}
 	}
 
@@ -245,15 +284,19 @@ func (c appConfig) migrateLegacyIfNeeded() appConfig {
 	return clone
 }
 
-func (c appConfig) toRuntimeClientConfig(selectedProvider wallpaperProvider, monitorIndex int, weatherBackgroundImageURL string) runtimeClientConfig {
+func (c appConfig) toRuntimeClientConfig(providers []wallpaperProvider, monitorIndex int, weatherBackgroundImageURL string) runtimeClientConfig {
 	return runtimeClientConfig{
-		SelectedProvider: selectedProvider,
-		MonitorIndex:     monitorIndex,
-		Plane:            c.Plane,
+		Providers:    providers,
+		MonitorIndex: monitorIndex,
+		Plane:        c.Plane,
 		Weather: runtimeWeatherConfig{
 			City:               c.Weather.City,
 			Corner:             c.Weather.Corner,
 			BackgroundImageURL: weatherBackgroundImageURL,
+		},
+		Currency: runtimeCurrencyConfig{
+			BaseCurrency: c.Currency.BaseCurrency,
+			Targets:      c.Currency.Targets,
 		},
 	}
 }
@@ -265,7 +308,8 @@ func (c appConfig) displayMonitorSelection() string {
 
 	parts := make([]string, 0, len(c.MonitorAssignments))
 	for _, assignment := range c.MonitorAssignments {
-		parts = append(parts, fmt.Sprintf("monitor %d: %s", assignment.MonitorIndex, assignment.Provider))
+		all := append([]wallpaperProvider{assignment.Provider}, assignment.Widgets...)
+		parts = append(parts, fmt.Sprintf("monitor %d: %v", assignment.MonitorIndex, all))
 	}
 	return strings.Join(parts, "; ")
 }
@@ -331,8 +375,17 @@ func isValidWeatherCorner(corner weatherWidgetCorner) bool {
 	}
 }
 
+func isValidProvider(p wallpaperProvider) bool {
+	switch p {
+	case providerNone, providerPlane, providerWeather, providerCurrency:
+		return true
+	default:
+		return false
+	}
+}
+
 func buildMonitorAssignments(monitorIndexes []int, provider wallpaperProvider) []monitorProviderAssignment {
-	if provider != providerNone && provider != providerPlane && provider != providerWeather {
+	if !isValidProvider(provider) {
 		provider = providerNone
 	}
 
@@ -344,7 +397,9 @@ func buildMonitorAssignments(monitorIndexes []int, provider wallpaperProvider) [
 		assignments = append(assignments, monitorProviderAssignment{
 			MonitorIndex: idx,
 			Provider:     provider,
+			Widgets:      []wallpaperProvider{},
 		})
 	}
 	return assignments
 }
+

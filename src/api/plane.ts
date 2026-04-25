@@ -9,11 +9,11 @@ import type {
 
 const BASE_URL = "/plane-api";
 
-type RuntimeProvider = "none" | "plane" | "weather";
+type RuntimeProvider = "none" | "plane" | "weather" | "currency";
 type WeatherCorner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 export interface RuntimeConfig {
-  selectedProvider: RuntimeProvider;
+  providers: RuntimeProvider[];
   monitorIndex: number;
   plane: {
     apiKey: string;
@@ -24,6 +24,10 @@ export interface RuntimeConfig {
     city: string;
     corner: WeatherCorner;
     backgroundImageUrl: string;
+  };
+  currency: {
+    baseCurrency: string;
+    targets: string[];
   };
 }
 
@@ -55,7 +59,7 @@ export async function getRuntimeConfig(): Promise<RuntimeConfig> {
     }
 
     const data = (await res.json()) as RuntimeConfig;
-    if (!data.selectedProvider || !data.plane || !data.weather) {
+    if (!data.providers || !data.plane || !data.weather || !data.currency) {
       throw new Error("runtime config is incomplete");
     }
     return data;

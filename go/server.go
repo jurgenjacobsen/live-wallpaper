@@ -64,7 +64,7 @@ func newHandler(cfg *appConfig, configPath string, readyState *frontendReadyStat
 
 		provider := wallpaperProvider(providerRaw)
 		switch provider {
-		case providerNone, providerPlane, providerWeather:
+		case providerNone, providerPlane, providerWeather, providerCurrency:
 		default:
 			http.Error(w, "invalid provider", http.StatusBadRequest)
 			return
@@ -92,14 +92,35 @@ func newHandler(cfg *appConfig, configPath string, readyState *frontendReadyStat
 	})
 
 	mux.HandleFunc("/api/runtime-config", func(w http.ResponseWriter, r *http.Request) {
-		provider, monitorIndex := resolveRuntimeSelection(r, *cfg)
+		providers, monitorIndex := resolveRuntimeSelection(r, *cfg)
 		weatherBackgroundImageURL := ""
 		if strings.TrimSpace(cfg.Weather.BackgroundImagePath) != "" {
 			weatherBackgroundImageURL = "/api/weather-background"
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(cfg.toRuntimeClientConfig(provider, monitorIndex, weatherBackgroundImageURL))
+		_ = json.NewEncoder(w).Encode(cfg.toRuntimeClientConfig(providers, monitorIndex, weatherBackgroundImageURL))
+	})
+
+	mux.HandleFunc("/api/currency-data", func(w http.ResponseWriter, r *http.Request) {
+		base := strings.TrimSpace(cfg.Currency.BaseCurrency)
+		if base == "" {
+			base = "USD"
+		}
+		targets := cfg.Currency.Targets
+		if len(targets) == 0 {
+			targets = []string{"EUR", "GBP", "JPY"}
+		}
+
+		data, err := fetchCurrencyData(r.Context(), base, targets)
+		if err != nil {
+			log.Printf("[live-wallpaper] currency update failed: %v", err)
+			http.Error(w, fmt.Sprintf("currency fetch failed: %v", err), http.StatusBadGateway)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(data)
 	})
 
 	mux.HandleFunc("/api/full-config", func(w http.ResponseWriter, r *http.Request) {
@@ -216,8 +237,8 @@ func newHandler(cfg *appConfig, configPath string, readyState *frontendReadyStat
 	return mux
 }
 
-func resolveRuntimeSelection(r *http.Request, cfg appConfig) (wallpaperProvider, int) {
-	defaultAssignment := monitorProviderAssignment{MonitorIndex: 0, Provider: providerNone}
+func resolveRuntimeSelection(r *http.Request, cfg appConfig) ([]wallpaperProvider, int) {
+	defaultAssignment := monitorProviderAssignment{MonitorIndex: 0, Provider: providerNone, Widgets: []wallpaperProvider{}}
 	if len(cfg.MonitorAssignments) > 0 {
 		defaultAssignment = cfg.MonitorAssignments[0]
 	}
@@ -237,11 +258,14 @@ func resolveRuntimeSelection(r *http.Request, cfg appConfig) (wallpaperProvider,
 		}
 	}
 
-	provider := assignmentForMonitor.Provider
+	mainProvider := assignmentForMonitor.Provider
 	rawProvider := wallpaperProvider(strings.TrimSpace(r.URL.Query().Get("provider")))
-	if rawProvider == providerNone || rawProvider == providerPlane || rawProvider == providerWeather {
-		provider = rawProvider
+	if isValidProvider(rawProvider) {
+		mainProvider = rawProvider
 	}
 
-	return provider, monitorIndex
+	providers := []wallpaperProvider{mainProvider}
+	providers = append(providers, assignmentForMonitor.Widgets...)
+
+	return providers, monitorIndex
 }
