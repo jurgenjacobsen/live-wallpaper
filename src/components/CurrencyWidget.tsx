@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useCurrencyData } from "../hooks/useCurrencyData";
 
 interface EnhancedGraphProps {
@@ -101,8 +102,18 @@ function EnhancedGraph({ data, dates, symbol }: EnhancedGraphProps) {
   );
 }
 
-export function CurrencyWidget() {
+export function CurrencyWidget({ onInitialDataReady }: { onInitialDataReady?: () => void }) {
   const { currencyData, loading, error } = useCurrencyData();
+  const notifiedRef = useRef(false);
+
+  useEffect(() => {
+    if (!loading && !notifiedRef.current) {
+      notifiedRef.current = true;
+      setTimeout(() => {
+        onInitialDataReady?.();
+      }, 500);
+    }
+  }, [loading, onInitialDataReady]);
 
   if (loading) return <div style={{ padding: "12px", fontSize: "13px", color: "#94a3b8" }}>Loading currency…</div>;
   if (error) return <div style={{ padding: "12px", fontSize: "13px", color: "#fecaca" }}>{error}</div>;

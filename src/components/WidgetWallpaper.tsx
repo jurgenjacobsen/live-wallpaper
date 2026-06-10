@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { RuntimeConfig } from "../api/plane";
 import { useWeatherData } from "../hooks/useWeatherData";
 import { CurrencyWidget } from "./CurrencyWidget";
@@ -45,13 +45,13 @@ export function WeatherWidget({ onInitialDataReady }: { onInitialDataReady?: () 
   const notifiedRef = useRef(false);
 
   useEffect(() => {
-    if (!loading && weather && !notifiedRef.current) {
+    if (!loading && !notifiedRef.current) {
       notifiedRef.current = true;
       setTimeout(() => {
         onInitialDataReady?.();
       }, 500);
     }
-  }, [loading, weather, onInitialDataReady]);
+  }, [loading, onInitialDataReady]);
 
   if (loading) return <p style={{ margin: 0 }}>Loading weather…</p>;
   if (error) return <p style={{ margin: 0, color: "#fecaca" }}>{error}</p>;
@@ -120,6 +120,56 @@ export function WeatherWidget({ onInitialDataReady }: { onInitialDataReady?: () 
 }
 
 export function WidgetWallpaper({ runtimeConfig, onInitialDataReady }: WidgetWallpaperProps) {
+  const bgUrl = runtimeConfig.weather.backgroundImageUrl;
+  const hasBg = !!bgUrl;
+  const hasWeather = runtimeConfig.providers.includes("weather");
+  const hasCurrency = runtimeConfig.providers.includes("currency");
+
+  const [bgLoaded, setBgLoaded] = useState(!hasBg);
+  const [weatherLoaded, setWeatherLoaded] = useState(!hasWeather);
+  const [currencyLoaded, setCurrencyLoaded] = useState(!hasCurrency);
+
+  // Preload and decode background image
+  useEffect(() => {
+    if (!hasBg) {
+      setBgLoaded(true);
+      return;
+    }
+
+    setBgLoaded(false);
+    const img = new Image();
+    img.src = bgUrl;
+    img.onload = () => {
+      if ('decode' in img) {
+        img.decode()
+          .then(() => {
+            setBgLoaded(true);
+          })
+          .catch((err) => {
+            console.error("Failed to decode background image:", err);
+            setBgLoaded(true);
+          });
+      } else {
+        setBgLoaded(true);
+      }
+    };
+    img.onerror = (err) => {
+      console.error("Failed to load background image:", err);
+      setBgLoaded(true);
+    };
+  }, [bgUrl, hasBg]);
+
+  // Coordinate readiness of all components
+  const allReady = bgLoaded && weatherLoaded && currencyLoaded;
+  const notifiedReadyRef = useRef(false);
+
+  useEffect(() => {
+    if (allReady && !notifiedReadyRef.current) {
+      notifiedReadyRef.current = true;
+      onInitialDataReady?.();
+    }
+  }, [allReady, onInitialDataReady]);
+
   return (
     <div
       style={{
@@ -127,13 +177,15 @@ export function WidgetWallpaper({ runtimeConfig, onInitialDataReady }: WidgetWal
         height: "100vh",
         position: "relative",
         overflow: "hidden",
-        backgroundImage: runtimeConfig.weather.backgroundImageUrl
-          ? `url(${runtimeConfig.weather.backgroundImageUrl})`
+        backgroundImage: (hasBg && bgLoaded)
+          ? `url(${bgUrl})`
           : "linear-gradient(135deg, #0f172a, #1e3a8a)",
         backgroundSize: "cover",
         backgroundPosition: "center",
         backgroundRepeat: "no-repeat",
         backgroundAttachment: "fixed",
+        opacity: allReady ? 1 : 0,
+        transition: "opacity 150ms ease-in-out",
       }}
     >
       <div
@@ -155,7 +207,7 @@ export function WidgetWallpaper({ runtimeConfig, onInitialDataReady }: WidgetWal
           zIndex: 2,
         }}
       >
-        {runtimeConfig.providers.includes("weather") && (
+        {hasWeather && (
           <div
             style={{
               padding: "12px",
@@ -166,11 +218,11 @@ export function WidgetWallpaper({ runtimeConfig, onInitialDataReady }: WidgetWal
               color: "#e2e8f0",
             }}
           >
-            <WeatherWidget onInitialDataReady={onInitialDataReady} />
+            <WeatherWidget onInitialDataReady={() => setWeatherLoaded(true)} />
           </div>
         )}
 
-        {runtimeConfig.providers.includes("currency") && (
+        {hasCurrency && (
           <div
             style={{
               padding: "12px",
@@ -181,7 +233,7 @@ export function WidgetWallpaper({ runtimeConfig, onInitialDataReady }: WidgetWal
               color: "#e2e8f0",
             }}
           >
-            <CurrencyWidget />
+            <CurrencyWidget onInitialDataReady={() => setCurrencyLoaded(true)} />
           </div>
         )}
       </div>
