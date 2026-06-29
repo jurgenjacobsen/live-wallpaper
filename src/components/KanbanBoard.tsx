@@ -6,23 +6,6 @@ interface KanbanBoardProps {
   onInitialDataReady?: () => void;
 }
 
-const COLUMN_CONFIG = [
-  {
-    key: "todo" as const,
-    title: "Todo",
-    accentColor: "#8f91a2",
-  },
-  {
-    key: "inProgress" as const,
-    title: "In Progress",
-    accentColor: "#f97316",
-  },
-  {
-    key: "done" as const,
-    title: "Done",
-    accentColor: "#22c55e",
-  },
-];
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString("en-US", {
@@ -66,7 +49,7 @@ function ErrorState({ message }: { message: string }) {
 }
 
 export function KanbanBoard({ onInitialDataReady }: KanbanBoardProps) {
-  const { groupedIssues, projectName, loading, error, lastUpdated } = usePlaneData();
+  const { groupedIssues, states, projectName, loading, error, lastUpdated } = usePlaneData();
   const notifiedRef = useRef(false);
 
   useEffect(() => {
@@ -76,10 +59,10 @@ export function KanbanBoard({ onInitialDataReady }: KanbanBoardProps) {
     }
   }, [loading, onInitialDataReady]);
 
-  const totalIssues =
-    groupedIssues.todo.length +
-    groupedIssues.inProgress.length +
-    groupedIssues.done.length;
+  const totalIssues = Object.values(groupedIssues).reduce(
+    (sum, list) => sum + (list?.length ?? 0),
+    0
+  );
 
   return (
     <div
@@ -152,16 +135,16 @@ export function KanbanBoard({ onInitialDataReady }: KanbanBoardProps) {
         <ErrorState message={error} />
       ) : (
         <div
-          className="flex gap-4"
-          style={{ flex: "1 1 0", minHeight: 0 }}
+          className="flex gap-4 overflow-x-auto pb-2"
+          style={{ flex: "1 1 0", minHeight: 0, scrollbarWidth: "thin" }}
         >
-          {COLUMN_CONFIG.map((col) => (
+          {states.map((state) => (
             <KanbanColumn
-              key={col.key}
-              title={col.title}
-              issues={groupedIssues[col.key]}
-              accentColor={col.accentColor}
-              columnGroup={col.key}
+              key={state.id}
+              title={state.name}
+              issues={groupedIssues[state.id] ?? []}
+              accentColor={state.color || "#8f91a2"}
+              columnGroup={state.group}
             />
           ))}
         </div>

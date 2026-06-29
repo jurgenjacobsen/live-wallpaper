@@ -75,7 +75,6 @@ export interface PlaneCycle {
 
 /** Issues grouped for the Kanban board */
 export interface GroupedIssues {
-  todo: PlaneIssue[];
-  inProgress: PlaneIssue[];
-  done: PlaneIssue[];
+  [stateId: string]: PlaneIssue[];
 }
+

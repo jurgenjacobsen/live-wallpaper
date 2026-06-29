@@ -5,13 +5,15 @@ interface KanbanColumnProps {
   title: string;
   issues: PlaneIssue[];
   accentColor: string;
-  columnGroup: "todo" | "inProgress" | "done";
+  columnGroup: "backlog" | "unstarted" | "started" | "completed" | "cancelled" | string;
 }
 
 const GROUP_ICONS: Record<string, string> = {
-  todo: "○",
-  inProgress: "◑",
-  done: "●",
+  backlog: "◌",
+  unstarted: "○",
+  started: "◑",
+  completed: "●",
+  cancelled: "⊘",
 };
 
 export function KanbanColumn({
@@ -28,8 +30,8 @@ export function KanbanColumn({
       style={{
         backgroundColor: "var(--plane-surface)",
         border: "1px solid var(--plane-border)",
-        flex: "1 1 0",
-        minWidth: 0,
+        flex: "1 0 280px",
+        maxWidth: "420px",
       }}
     >
       {/* Column header */}

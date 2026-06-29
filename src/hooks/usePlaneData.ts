@@ -21,6 +21,7 @@ import {
 
 interface UsePlaneDataReturn {
   groupedIssues: GroupedIssues;
+  states: PlaneState[];
   projectName: string;
   loading: boolean;
   error: string | null;
@@ -66,30 +67,21 @@ function groupIssuesByState(
   issues: PlaneIssue[],
   states: PlaneState[]
 ): GroupedIssues {
-  const stateMap = new Map<string, PlaneState>();
-  for (const s of states) {
-    stateMap.set(s.id, s);
-  }
+  const grouped: GroupedIssues = {};
 
-  const todo: PlaneIssue[] = [];
-  const inProgress: PlaneIssue[] = [];
-  const done: PlaneIssue[] = [];
+  for (const s of states) {
+    grouped[s.id] = [];
+  }
 
   for (const issue of issues) {
-    const state = issue.state_detail ?? stateMap.get(issue.state);
-    const group = state?.group ?? "unstarted";
-
-    if (group === "started") {
-      inProgress.push(issue);
-    } else if (group === "completed") {
-      done.push(issue);
-    } else {
-      // backlog, unstarted, cancelled → Todo
-      todo.push(issue);
+    const stateId = issue.state;
+    if (!grouped[stateId]) {
+      grouped[stateId] = [];
     }
+    grouped[stateId].push(issue);
   }
 
-  return { todo, inProgress, done };
+  return grouped;
 }
 
 function looksLikeHashOrId(value: string): boolean {
@@ -164,11 +156,8 @@ function enrichIssueDetails(
 }
 
 export function usePlaneData(): UsePlaneDataReturn {
-  const [groupedIssues, setGroupedIssues] = useState<GroupedIssues>({
-    todo: [],
-    inProgress: [],
-    done: [],
-  });
+  const [groupedIssues, setGroupedIssues] = useState<GroupedIssues>({});
+  const [states, setStates] = useState<PlaneState[]>([]);
   const [projectName, setProjectName] = useState("Project");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -210,6 +199,11 @@ export function usePlaneData(): UsePlaneDataReturn {
 
         if (cancelled) return;
 
+        const sortedStates = fetchedStates.sort((a, b) => a.sequence - b.sequence);
+        if (!cancelled) {
+          setStates(sortedStates);
+        }
+
         let issues: PlaneIssue[];
 
         const activeCycle = activeCycles.find((c) => c.status === "current");
@@ -235,7 +229,7 @@ export function usePlaneData(): UsePlaneDataReturn {
             ? enrichedIssues.filter((i) => i.assignees.includes(currentUser.id))
             : enrichedIssues;
 
-        setGroupedIssues(groupIssuesByState(filteredIssues, fetchedStates));
+        setGroupedIssues(groupIssuesByState(filteredIssues, sortedStates));
         setLastUpdated(new Date());
       } catch (err) {
         if (!cancelled) {
@@ -255,6 +249,7 @@ export function usePlaneData(): UsePlaneDataReturn {
 
   return {
     groupedIssues,
+    states,
     projectName,
     loading,
     error,
