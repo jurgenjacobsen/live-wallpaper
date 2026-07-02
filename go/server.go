@@ -4,6 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -190,6 +191,40 @@ func newHandler(cfg *appConfig, configPath string, readyState *frontendReadyStat
 
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(forecast)
+	})
+
+	mux.HandleFunc("/api/aviation-weather", func(w http.ResponseWriter, r *http.Request) {
+		ids := strings.TrimSpace(r.URL.Query().Get("ids"))
+		if ids == "" {
+			ids = strings.TrimSpace(cfg.Weather.Airports)
+		}
+		if ids == "" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("[]"))
+			return
+		}
+
+		// Fetch from aviationweather.gov
+		targetURL := fmt.Sprintf("https://aviationweather.gov/api/data/metar?ids=%s&format=json&taf=true", url.QueryEscape(ids))
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, targetURL, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Printf("[live-wallpaper] aviation weather update failed for %q: %v", ids, err)
+			http.Error(w, fmt.Sprintf("failed to fetch aviation weather: %v", err), http.StatusBadGateway)
+			return
+		}
+		defer res.Body.Close()
+
+		w.Header().Set("Content-Type", "application/json")
+		if res.StatusCode != http.StatusOK {
+			w.WriteHeader(res.StatusCode)
+		}
+		_, _ = io.Copy(w, res.Body)
 	})
 
 	mux.HandleFunc("/api/weather-background", func(w http.ResponseWriter, r *http.Request) {

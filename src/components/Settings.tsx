@@ -20,6 +20,9 @@ interface FullConfig {
     city: string
     corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
     backgroundImagePath: string
+    enableMetar?: boolean
+    enableTaf?: boolean
+    airports?: string
   }
   currency: {
     baseCurrency: string
@@ -216,6 +219,42 @@ export function Settings() {
                   <option value="bottom-left">Bottom Left</option>
                   <option value="bottom-right">Bottom Right</option>
                 </select>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <h2 className="text-xl font-semibold border-b border-slate-800 pb-2 text-violet-400">Aviation Weather (METAR / TAF)</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex items-center gap-6 md:col-span-2">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    checked={config.weather.enableMetar || false}
+                    onChange={e => setConfig({...config, weather: {...config.weather, enableMetar: e.target.checked}})}
+                    className="w-5 h-5 rounded border-slate-700 bg-slate-950 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900"
+                  />
+                  <span className="text-slate-300 group-hover:text-white transition-colors">Enable METAR</span>
+                </label>
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    checked={config.weather.enableTaf || false}
+                    onChange={e => setConfig({...config, weather: {...config.weather, enableTaf: e.target.checked}})}
+                    className="w-5 h-5 rounded border-slate-700 bg-slate-950 text-violet-500 focus:ring-violet-500 focus:ring-offset-slate-900"
+                  />
+                  <span className="text-slate-300 group-hover:text-white transition-colors">Enable TAF</span>
+                </label>
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-sm font-medium text-slate-400">Airports (ICAO codes, comma separated)</label>
+                <input 
+                  type="text" 
+                  value={config.weather.airports || ''}
+                  onChange={e => setConfig({...config, weather: {...config.weather, airports: e.target.value}})}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 focus:ring-2 focus:ring-violet-500 outline-none"
+                  placeholder="e.g. KJFK, EGLL, LFPG"
+                />
               </div>
             </div>
           </section>

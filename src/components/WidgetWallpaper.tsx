@@ -40,8 +40,27 @@ function widgetCornerStyle(corner: RuntimeConfig["weather"]["corner"]): React.CS
   }
 }
 
-export function WeatherWidget({ onInitialDataReady }: { onInitialDataReady?: () => void }) {
-  const { weather, loading, error } = useWeatherData();
+function getFltCatColor(fltCat?: string): { bg: string; text: string } {
+  switch (fltCat?.toUpperCase()) {
+    case "VFR":
+      return { bg: "rgba(16, 185, 129, 0.15)", text: "#34d399" };
+    case "MVFR":
+      return { bg: "rgba(59, 130, 246, 0.15)", text: "#60a5fa" };
+    case "IFR":
+      return { bg: "rgba(239, 68, 68, 0.15)", text: "#f87171" };
+    case "LIFR":
+      return { bg: "rgba(236, 72, 153, 0.15)", text: "#f472b6" };
+    default:
+      return { bg: "rgba(148, 163, 184, 0.15)", text: "#cbd5e1" };
+  }
+}
+
+export function WeatherWidget({ runtimeConfig, onInitialDataReady }: { runtimeConfig: RuntimeConfig; onInitialDataReady?: () => void }) {
+  const { weather, aviationWeather, loading, error } = useWeatherData({
+    enableMetar: runtimeConfig.weather.enableMetar,
+    enableTaf: runtimeConfig.weather.enableTaf,
+    airports: runtimeConfig.weather.airports,
+  });
   const notifiedRef = useRef(false);
 
   useEffect(() => {
@@ -115,6 +134,69 @@ export function WeatherWidget({ onInitialDataReady }: { onInitialDataReady?: () 
           </div>
         ))}
       </div>
+
+      {aviationWeather && aviationWeather.length > 0 && (
+        <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          {aviationWeather.map((data) => {
+            const hasMetar = runtimeConfig.weather.enableMetar && data.rawOb;
+            const hasTaf = runtimeConfig.weather.enableTaf && data.rawTaf;
+            if (!hasMetar && !hasTaf) return null;
+
+            const fltCatColor = getFltCatColor(data.fltCat);
+
+            return (
+              <div
+                key={data.icaoId}
+                style={{
+                  borderRadius: "10px",
+                  padding: "8px 10px",
+                  background: "rgba(15, 23, 42, 0.6)",
+                  border: "1px solid rgba(148, 163, 184, 0.25)",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 700 }}>
+                    {data.icaoId}
+                  </span>
+                  {data.fltCat && (
+                    <span
+                      style={{
+                        fontSize: "9px",
+                        fontWeight: 700,
+                        padding: "1px 5px",
+                        borderRadius: "4px",
+                        background: fltCatColor.bg,
+                        color: fltCatColor.text,
+                        border: `1px solid ${fltCatColor.text}33`,
+                      }}
+                    >
+                      {data.fltCat}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {hasMetar && (
+                    <div style={{ display: "flex", gap: "4px", alignItems: "flex-start" }}>
+                      <span style={{ fontSize: "9px", fontWeight: 700, color: "#94a3b8", width: "42px", marginTop: "2px", flexShrink: 0 }}>METAR</span>
+                      <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#e2e8f0", wordBreak: "break-all", lineHeight: 1.3 }}>
+                        {data.rawOb}
+                      </span>
+                    </div>
+                  )}
+                  {hasTaf && (
+                    <div style={{ display: "flex", gap: "4px", alignItems: "flex-start" }}>
+                      <span style={{ fontSize: "9px", fontWeight: 700, color: "#94a3b8", width: "42px", marginTop: "2px", flexShrink: 0 }}>TAF</span>
+                      <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#cbd5e1", wordBreak: "break-all", lineHeight: 1.3 }}>
+                        {data.rawTaf}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }
@@ -218,7 +300,7 @@ export function WidgetWallpaper({ runtimeConfig, onInitialDataReady }: WidgetWal
               color: "#e2e8f0",
             }}
           >
-            <WeatherWidget onInitialDataReady={() => setWeatherLoaded(true)} />
+            <WeatherWidget runtimeConfig={runtimeConfig} onInitialDataReady={() => setWeatherLoaded(true)} />
           </div>
         )}
 

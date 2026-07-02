@@ -1,15 +1,17 @@
 import { useEffect, useState } from "react";
-import { fetchWeatherForecast } from "../api/weather";
-import type { WeatherForecastPayload } from "../types/weather";
+import { fetchWeatherForecast, fetchAviationWeather } from "../api/weather";
+import type { WeatherForecastPayload, AviationWeatherData } from "../types/weather";
 
 interface UseWeatherDataResult {
   weather: WeatherForecastPayload | null;
+  aviationWeather: AviationWeatherData[] | null;
   loading: boolean;
   error: string | null;
 }
 
-export function useWeatherData(): UseWeatherDataResult {
+export function useWeatherData(config?: { enableMetar?: boolean; enableTaf?: boolean; airports?: string }): UseWeatherDataResult {
   const [weather, setWeather] = useState<WeatherForecastPayload | null>(null);
+  const [aviationWeather, setAviationWeather] = useState<AviationWeatherData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,9 +23,21 @@ export function useWeatherData(): UseWeatherDataResult {
       setError(null);
 
       try {
-        const data = await fetchWeatherForecast();
+        const fetchWeatherPromise = fetchWeatherForecast();
+
+        const shouldFetchAviation = (config?.enableMetar || config?.enableTaf) && config?.airports;
+        const fetchAviationPromise = shouldFetchAviation
+          ? fetchAviationWeather(config.airports)
+          : Promise.resolve(null);
+
+        const [weatherData, aviationData] = await Promise.all([
+          fetchWeatherPromise,
+          fetchAviationPromise,
+        ]);
+
         if (!cancelled) {
-          setWeather(data);
+          setWeather(weatherData);
+          setAviationWeather(aviationData);
         }
       } catch (err) {
         if (!cancelled) {
@@ -40,7 +54,7 @@ export function useWeatherData(): UseWeatherDataResult {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [config?.enableMetar, config?.enableTaf, config?.airports]);
 
-  return { weather, loading, error };
+  return { weather, aviationWeather, loading, error };
 }

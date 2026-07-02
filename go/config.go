@@ -45,6 +45,9 @@ type providerWeatherConfig struct {
 	City                string              `json:"city"`
 	Corner              weatherWidgetCorner `json:"corner"`
 	BackgroundImagePath string              `json:"backgroundImagePath"`
+	EnableMetar         bool                `json:"enableMetar"`
+	EnableTaf           bool                `json:"enableTaf"`
+	Airports            string              `json:"airports"`
 }
 
 type providerCurrencyConfig struct {
@@ -88,6 +91,9 @@ type runtimeWeatherConfig struct {
 	City               string              `json:"city"`
 	Corner             weatherWidgetCorner `json:"corner"`
 	BackgroundImageURL string              `json:"backgroundImageUrl"`
+	EnableMetar        bool                `json:"enableMetar"`
+	EnableTaf          bool                `json:"enableTaf"`
+	Airports           string              `json:"airports"`
 }
 
 type runtimeCurrencyConfig struct {
@@ -174,6 +180,18 @@ func (c appConfig) normalized() appConfig {
 	clone.Weather.APIKey = strings.TrimSpace(clone.Weather.APIKey)
 	clone.Weather.City = strings.TrimSpace(clone.Weather.City)
 	clone.Weather.BackgroundImagePath = strings.TrimSpace(clone.Weather.BackgroundImagePath)
+
+	if clone.Weather.Airports != "" {
+		parts := strings.Split(clone.Weather.Airports, ",")
+		var cleaned []string
+		for _, p := range parts {
+			trimmed := strings.ToUpper(strings.TrimSpace(p))
+			if trimmed != "" {
+				cleaned = append(cleaned, trimmed)
+			}
+		}
+		clone.Weather.Airports = strings.Join(cleaned, ",")
+	}
 
 	if clone.Currency.BaseCurrency == "" {
 		clone.Currency.BaseCurrency = "USD"
@@ -293,6 +311,9 @@ func (c appConfig) toRuntimeClientConfig(providers []wallpaperProvider, monitorI
 			City:               c.Weather.City,
 			Corner:             c.Weather.Corner,
 			BackgroundImageURL: weatherBackgroundImageURL,
+			EnableMetar:        c.Weather.EnableMetar,
+			EnableTaf:          c.Weather.EnableTaf,
+			Airports:           c.Weather.Airports,
 		},
 		Currency: runtimeCurrencyConfig{
 			BaseCurrency: c.Currency.BaseCurrency,

@@ -23,3 +23,26 @@ export interface WeatherForecastPayload {
   current: WeatherCurrentRow;
   days: WeatherDayColumn[];
 }
+
+export interface AviationWeatherData {
+  icaoId: string;
+  receiptTime?: string;
+  obsTime?: number;
+  reportTime?: string;
+  temp?: number;
+  dewp?: number;
+  wdir?: number;
+  wspd?: number;
+  wgst?: number;
+  visib?: string;
+  altim?: number;
+  metarType?: string;
+  rawOb?: string;
+  lat?: number;
+  lon?: number;
+  elev?: number;
+  name?: string;
+  cover?: string;
+  fltCat?: string;
+  rawTaf?: string;
+}

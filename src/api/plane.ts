@@ -24,6 +24,9 @@ export interface RuntimeConfig {
     city: string;
     corner: WeatherCorner;
     backgroundImageUrl: string;
+    enableMetar?: boolean;
+    enableTaf?: boolean;
+    airports?: string;
   };
   currency: {
     baseCurrency: string;
