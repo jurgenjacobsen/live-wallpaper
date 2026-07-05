@@ -178,7 +178,7 @@ export function WeatherWidget({ runtimeConfig, onInitialDataReady }: { runtimeCo
                   {hasMetar && (
                     <div style={{ display: "flex", gap: "4px", alignItems: "flex-start" }}>
                       <span style={{ fontSize: "9px", fontWeight: 700, color: "#94a3b8", width: "42px", marginTop: "2px", flexShrink: 0 }}>METAR</span>
-                      <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#e2e8f0", wordBreak: "break-all", lineHeight: 1.3 }}>
+                      <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#e2e8f0", overflowWrap: "break-word", lineHeight: 1.3 }}>
                         {data.rawOb}
                       </span>
                     </div>
@@ -186,7 +186,7 @@ export function WeatherWidget({ runtimeConfig, onInitialDataReady }: { runtimeCo
                   {hasTaf && (
                     <div style={{ display: "flex", gap: "4px", alignItems: "flex-start" }}>
                       <span style={{ fontSize: "9px", fontWeight: 700, color: "#94a3b8", width: "42px", marginTop: "2px", flexShrink: 0 }}>TAF</span>
-                      <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#cbd5e1", wordBreak: "break-all", lineHeight: 1.3 }}>
+                      <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#cbd5e1", overflowWrap: "break-word", lineHeight: 1.3 }}>
                         {data.rawTaf}
                       </span>
                     </div>
