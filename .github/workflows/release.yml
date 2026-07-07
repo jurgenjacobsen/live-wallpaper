@@ -79,9 +79,11 @@ jobs:
           mkdir -p package/usr/bin
           cp "build/bin/Live Wallpaper" package/usr/bin/live-wallpaper
           mkdir -p package/DEBIAN
+          VERSION_NAME="${{ github.ref_name }}"
+          VERSION_NAME="${VERSION_NAME#v}"
           cat <<EOF > package/DEBIAN/control
           Package: live-wallpaper
-          Version: ${{ github.ref_name }}
+          Version: ${VERSION_NAME}
           Section: custom
           Priority: optional
           Architecture: amd64
