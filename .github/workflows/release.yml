@@ -77,7 +77,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: |
           mkdir -p package/usr/bin
-          cp build/bin/live-wallpaper package/usr/bin/
+          cp "build/bin/Live Wallpaper" package/usr/bin/live-wallpaper
           mkdir -p package/DEBIAN
           cat <<EOF > package/DEBIAN/control
           Package: live-wallpaper
