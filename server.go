@@ -1,0 +1,306 @@
+package main
+
+import (
+	"embed"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/fs"
+	"log"
+	"net/http"
+	"net/http/httputil"
+	"net/url"
+	"os"
+	"path"
+	"strconv"
+	"strings"
+)
+
+//go:embed all:frontend/dist
+var distFS embed.FS
+
+// newHandler returns an http.Handler that:
+//   - Proxies requests under /plane-api/ to https://api.plane.so
+//   - Exposes runtime config for the embedded frontend under /api/runtime-config
+//   - Exposes weather forecast payload under /api/weather-forecast
+//   - Exposes weather background image under /api/weather-background
+//   - Serves the embedded React production build for all other paths
+func newHandler(cfg *appConfig, configPath string, readyState *frontendReadyState, saveConfigCh chan<- appConfig, settingsClosedCh chan<- struct{}) http.Handler {
+	sub, err := fs.Sub(distFS, "frontend/dist")
+	if err != nil {
+		panic("embedded dist/ directory not found: " + err.Error())
+	}
+	fileServer := http.FileServer(http.FS(sub))
+
+	target, _ := url.Parse("https://api.plane.so")
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.Director = func(req *http.Request) {
+		req.URL.Scheme = "https"
+		req.URL.Host = "api.plane.so"
+		req.Host = "api.plane.so"
+		// Strip the /plane-api prefix so /plane-api/api/v1/... → /api/v1/...
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/plane-api")
+		req.URL.RawPath = strings.TrimPrefix(req.URL.RawPath, "/plane-api")
+	}
+
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/api/settings-closed", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if settingsClosedCh != nil {
+			select {
+			case settingsClosedCh <- struct{}{}:
+			default:
+			}
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	mux.HandleFunc("/api/frontend-ready", func(w http.ResponseWriter, r *http.Request) {
+		providerRaw := strings.TrimSpace(r.URL.Query().Get("provider"))
+		monitorRaw := strings.TrimSpace(r.URL.Query().Get("monitor"))
+
+		provider := wallpaperProvider(providerRaw)
+		switch provider {
+		case providerNone, providerPlane, providerWeather, providerCurrency:
+		default:
+			http.Error(w, "invalid provider", http.StatusBadRequest)
+			return
+		}
+
+		monitorIndex, err := strconv.Atoi(monitorRaw)
+		if err != nil || monitorIndex < 0 {
+			http.Error(w, "invalid monitor", http.StatusBadRequest)
+			return
+		}
+
+		if r.Method == http.MethodPost {
+			readyState.MarkReady(provider, monitorIndex)
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]bool{"ready": readyState.IsReady(provider, monitorIndex)})
+	})
+
+	mux.HandleFunc("/api/runtime-config", func(w http.ResponseWriter, r *http.Request) {
+		providers, monitorIndex := resolveRuntimeSelection(r, *cfg)
+		weatherBackgroundImageURL := ""
+		if strings.TrimSpace(cfg.Weather.BackgroundImagePath) != "" {
+			weatherBackgroundImageURL = "/api/weather-background"
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(cfg.toRuntimeClientConfig(providers, monitorIndex, weatherBackgroundImageURL))
+	})
+
+	mux.HandleFunc("/api/currency-data", func(w http.ResponseWriter, r *http.Request) {
+		base := strings.TrimSpace(cfg.Currency.BaseCurrency)
+		if base == "" {
+			base = "USD"
+		}
+		targets := cfg.Currency.Targets
+		if len(targets) == 0 {
+			targets = []string{"EUR", "GBP", "JPY"}
+		}
+
+		data, err := fetchCurrencyData(r.Context(), base, targets)
+		if err != nil {
+			log.Printf("[live-wallpaper] currency update failed: %v", err)
+			http.Error(w, fmt.Sprintf("currency fetch failed: %v", err), http.StatusBadGateway)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(data)
+	})
+
+	mux.HandleFunc("/api/full-config", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(cfg)
+			return
+		}
+
+		if r.Method == http.MethodPost {
+			var newCfg appConfig
+			if err := json.NewDecoder(r.Body).Decode(&newCfg); err != nil {
+				http.Error(w, "invalid config payload", http.StatusBadRequest)
+				return
+			}
+
+			newCfg = newCfg.normalized()
+			if err := newCfg.validate(); err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			if err := saveAppConfig(configPath, newCfg); err != nil {
+				http.Error(w, "failed to save config: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			*cfg = newCfg
+			if saveConfigCh != nil {
+				select {
+				case saveConfigCh <- newCfg:
+				default:
+				}
+			}
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	})
+
+	mux.HandleFunc("/api/monitors", func(w http.ResponseWriter, r *http.Request) {
+		monitors, err := listMonitorIndexes()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(monitors)
+	})
+
+	mux.HandleFunc("/api/weather-forecast", func(w http.ResponseWriter, r *http.Request) {
+		city := strings.TrimSpace(cfg.Weather.City)
+		if strings.TrimSpace(cfg.Weather.APIKey) == "" || city == "" {
+			log.Printf("[live-wallpaper] weather update skipped: provider not configured")
+			http.Error(w, "weather provider is not configured", http.StatusBadRequest)
+			return
+		}
+
+		forecast, err := fetchWeatherForecast(r.Context(), cfg.Weather.APIKey, city)
+		if err != nil {
+			log.Printf("[live-wallpaper] weather update failed for %q: %v", city, err)
+			http.Error(w, fmt.Sprintf("weather fetch failed: %v", err), http.StatusBadGateway)
+			return
+		}
+		log.Printf("[live-wallpaper] weather updated for %q at %s (%d day(s), %dC)", forecast.City, forecast.UpdatedAt, len(forecast.Days), forecast.Current.TempC)
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(forecast)
+	})
+
+	mux.HandleFunc("/api/aviation-weather", func(w http.ResponseWriter, r *http.Request) {
+		ids := strings.TrimSpace(r.URL.Query().Get("ids"))
+		if ids == "" {
+			ids = strings.TrimSpace(cfg.Weather.Airports)
+		}
+		if ids == "" {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte("[]"))
+			return
+		}
+
+		// Fetch from aviationweather.gov
+		targetURL := fmt.Sprintf("https://aviationweather.gov/api/data/metar?ids=%s&format=json&taf=true", url.QueryEscape(ids))
+		req, err := http.NewRequestWithContext(r.Context(), http.MethodGet, targetURL, nil)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Printf("[live-wallpaper] aviation weather update failed for %q: %v", ids, err)
+			http.Error(w, fmt.Sprintf("failed to fetch aviation weather: %v", err), http.StatusBadGateway)
+			return
+		}
+		defer res.Body.Close()
+
+		w.Header().Set("Content-Type", "application/json")
+		if res.StatusCode != http.StatusOK {
+			w.WriteHeader(res.StatusCode)
+		}
+		_, _ = io.Copy(w, res.Body)
+	})
+
+	mux.HandleFunc("/api/weather-background", func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimSpace(cfg.Weather.BackgroundImagePath)
+		if path == "" {
+			http.NotFound(w, r)
+			return
+		}
+
+		if _, err := os.Stat(path); err != nil {
+			http.NotFound(w, r)
+			return
+		}
+
+		w.Header().Set("Cache-Control", "public, max-age=3600")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		http.ServeFile(w, r, path)
+	})
+
+	mux.Handle("/plane-api/", proxy)
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		cleanPath := path.Clean(r.URL.Path)
+		if cleanPath == "." || cleanPath == "/" {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		rel := strings.TrimPrefix(cleanPath, "/")
+		if rel != "" {
+			if _, err := fs.Stat(sub, rel); err == nil {
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		indexData, err := fs.ReadFile(sub, "index.html")
+		if err != nil {
+			http.Error(w, "index.html not found", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write(indexData)
+	})
+
+	return mux
+}
+
+func resolveRuntimeSelection(r *http.Request, cfg appConfig) ([]wallpaperProvider, int) {
+	defaultAssignment := monitorProviderAssignment{MonitorIndex: 0, Provider: providerNone, Widgets: []wallpaperProvider{}}
+	if len(cfg.MonitorAssignments) > 0 {
+		defaultAssignment = cfg.MonitorAssignments[0]
+	}
+
+	monitorIndex := defaultAssignment.MonitorIndex
+	if rawMonitor := strings.TrimSpace(r.URL.Query().Get("monitor")); rawMonitor != "" {
+		if parsed, err := strconv.Atoi(rawMonitor); err == nil && parsed >= 0 {
+			monitorIndex = parsed
+		}
+	}
+
+	assignmentForMonitor := defaultAssignment
+	for _, assignment := range cfg.MonitorAssignments {
+		if assignment.MonitorIndex == monitorIndex {
+			assignmentForMonitor = assignment
+			break
+		}
+	}
+
+	mainProvider := assignmentForMonitor.Provider
+	rawProvider := wallpaperProvider(strings.TrimSpace(r.URL.Query().Get("provider")))
+	if isValidProvider(rawProvider) {
+		mainProvider = rawProvider
+	}
+
+	providers := []wallpaperProvider{mainProvider}
+	providers = append(providers, assignmentForMonitor.Widgets...)
+
+	return providers, monitorIndex
+}

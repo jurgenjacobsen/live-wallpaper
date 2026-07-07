@@ -8,8 +8,8 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b %ERRORLEVEL%
 )
 
-for /f "usebackq delims=" %%v in (`node -p "require('./package.json').version"`) do set APP_VERSION=%%v
-if "%APP_VERSION%"=="" set APP_VERSION=0.1.0
+for /f "usebackq delims=" %%v in (`node -p "require('./frontend/package.json').version"`) do set APP_VERSION=%%v
+if "%APP_VERSION%"=="" set APP_VERSION=2.0.0
 
 where ISCC >NUL 2>&1
 if %ERRORLEVEL% EQU 0 (
@@ -21,12 +21,11 @@ if %ERRORLEVEL% EQU 0 (
 if not exist "%ISCC_CMD%" (
     echo [installer] Inno Setup compiler not found.
     echo [installer] Install Inno Setup from: https://jrsoftware.org/isinfo.php
-    echo [installer] Then rerun this script.
     exit /b 1
 )
 
 echo [installer] Building installer for version %APP_VERSION%...
-"%ISCC_CMD%" "/DMyAppVersion=%APP_VERSION%" "/DMySourceExe=..\Live Wallpaper.exe" "installer\LiveWallpaper.iss"
+"%ISCC_CMD%" "/DMyAppVersion=%APP_VERSION%" "/DMySourceExe=..\build\bin\Live Wallpaper.exe" "installer\LiveWallpaper.iss"
 if %ERRORLEVEL% NEQ 0 (
     echo [installer] ERROR: installer build failed.
     exit /b %ERRORLEVEL%

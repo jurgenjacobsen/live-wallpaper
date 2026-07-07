@@ -1,0 +1,98 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build Release Assets
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+        include:
+          - os: windows-latest
+            platform: windows/amd64
+            output: Live Wallpaper.exe
+          - os: macos-latest
+            platform: darwin/universal
+            output: Live Wallpaper.app
+          - os: ubuntu-latest
+            platform: linux/amd64
+            output: live-wallpaper
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.22
+
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Install System Dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev build-essential pkg-config
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm install
+
+      - name: Build and Package Application
+        run: |
+          wails build -platform ${{ matrix.platform }} -clean
+
+      # Package Windows installer using Inno Setup
+      - name: Package Windows Installer
+        if: matrix.os == 'windows-latest'
+        run: |
+          iscc /DMyAppVersion=${{ github.ref_name }} /DMySourceExe="build/bin/Live Wallpaper.exe" "installer/LiveWallpaper.iss"
+          mv installer/dist/LiveWallpaper-Setup-*.exe build/bin/LiveWallpaper-Setup-${{ github.ref_name }}.exe
+
+      # Package macOS DMG
+      - name: Package macOS DMG
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd build/bin
+          hdiutil create -fs HFS+ -srcfolder "Live Wallpaper.app" -volname "Live Wallpaper" "LiveWallpaper-${{ github.ref_name }}.dmg"
+
+      # Package Linux DEB
+      - name: Package Linux DEB
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir -p package/usr/bin
+          cp build/bin/live-wallpaper package/usr/bin/
+          mkdir -p package/DEBIAN
+          cat <<EOF > package/DEBIAN/control
+          Package: live-wallpaper
+          Version: ${{ github.ref_name }}
+          Section: custom
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Jürgen Jacobsen <jurgenjacobsen@outlook.com>
+          Description: Live Wallpaper status board application.
+          EOF
+          dpkg-deb --build package build/bin/live-wallpaper-${{ github.ref_name }}.deb
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/bin/LiveWallpaper-Setup-*.exe
+            build/bin/LiveWallpaper-*.dmg
+            build/bin/live-wallpaper-*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

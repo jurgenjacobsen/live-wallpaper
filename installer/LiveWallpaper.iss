@@ -2,7 +2,7 @@
 ; Build with: ISCC installer\LiveWallpaper.iss
 
 #ifndef MySourceIcon
-  #define MySourceIcon "..\go\assets\icon.ico"
+  #define MySourceIcon "..\build\windows\icon.ico"
 #endif
 #define MyAppName "Live Wallpaper"
 #ifndef MyAppVersion
