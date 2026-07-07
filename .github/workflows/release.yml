@@ -16,12 +16,15 @@ jobs:
           - os: windows-latest
             platform: windows/amd64
             output: Live Wallpaper.exe
+            tags: ""
           - os: macos-latest
             platform: darwin/universal
             output: Live Wallpaper.app
+            tags: ""
           - os: ubuntu-latest
             platform: linux/amd64
             output: live-wallpaper
+            tags: "-tags webkit2gtk_4_1"
 
     steps:
       - name: Checkout Code
@@ -53,7 +56,7 @@ jobs:
 
       - name: Build and Package Application
         run: |
-          wails build -platform ${{ matrix.platform }} -clean
+          wails build -platform ${{ matrix.platform }} -clean ${{ matrix.tags }}
 
       # Package Windows installer using Inno Setup
       - name: Package Windows Installer
