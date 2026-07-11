@@ -56,7 +56,7 @@ function getFltCatColor(fltCat?: string): { bg: string; text: string } {
 }
 
 export function WeatherWidget({ runtimeConfig, onInitialDataReady }: { runtimeConfig: RuntimeConfig; onInitialDataReady?: () => void }) {
-  const { weather, aviationWeather, loading, error } = useWeatherData({
+  const { weather, aviationWeather, loading, error, aviationError } = useWeatherData({
     enableMetar: runtimeConfig.weather.enableMetar,
     enableTaf: runtimeConfig.weather.enableTaf,
     airports: runtimeConfig.weather.airports,
@@ -135,9 +135,25 @@ export function WeatherWidget({ runtimeConfig, onInitialDataReady }: { runtimeCo
         ))}
       </div>
 
-      {aviationWeather && aviationWeather.length > 0 && (
+      {(aviationError || (aviationWeather && aviationWeather.length > 0)) && (
         <div style={{ marginTop: "10px", display: "flex", flexDirection: "column", gap: "6px" }}>
-          {aviationWeather.map((data) => {
+          {aviationError && (
+            <div
+              style={{
+                borderRadius: "10px",
+                padding: "8px 10px",
+                background: "rgba(239, 68, 68, 0.12)",
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                color: "#fecaca",
+                fontSize: "11px",
+                lineHeight: 1.4,
+              }}
+            >
+              <div style={{ fontWeight: 700, marginBottom: "2px" }}>Aviation Weather Alert</div>
+              <div style={{ fontFamily: "monospace" }}>{aviationError}</div>
+            </div>
+          )}
+          {aviationWeather && aviationWeather.map((data) => {
             const hasMetar = runtimeConfig.weather.enableMetar && data.rawOb;
             const hasTaf = runtimeConfig.weather.enableTaf && data.rawTaf;
             if (!hasMetar && !hasTaf) return null;

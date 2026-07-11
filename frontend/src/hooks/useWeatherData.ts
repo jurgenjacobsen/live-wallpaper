@@ -7,6 +7,7 @@ interface UseWeatherDataResult {
   aviationWeather: AviationWeatherData[] | null;
   loading: boolean;
   error: string | null;
+  aviationError: string | null;
 }
 
 export function useWeatherData(config?: { enableMetar?: boolean; enableTaf?: boolean; airports?: string }): UseWeatherDataResult {
@@ -14,6 +15,7 @@ export function useWeatherData(config?: { enableMetar?: boolean; enableTaf?: boo
   const [aviationWeather, setAviationWeather] = useState<AviationWeatherData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [aviationError, setAviationError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -21,13 +23,20 @@ export function useWeatherData(config?: { enableMetar?: boolean; enableTaf?: boo
     async function load() {
       setLoading(true);
       setError(null);
+      setAviationError(null);
 
       try {
         const fetchWeatherPromise = fetchWeatherForecast();
 
         const shouldFetchAviation = (config?.enableMetar || config?.enableTaf) && config?.airports;
         const fetchAviationPromise = shouldFetchAviation
-          ? fetchAviationWeather(config.airports)
+          ? fetchAviationWeather(config.airports).catch((err) => {
+              console.error("Aviation weather load failed:", err);
+              if (!cancelled) {
+                setAviationError(err instanceof Error ? err.message : String(err));
+              }
+              return null;
+            })
           : Promise.resolve(null);
 
         const [weatherData, aviationData] = await Promise.all([
@@ -56,5 +65,5 @@ export function useWeatherData(config?: { enableMetar?: boolean; enableTaf?: boo
     };
   }, [config?.enableMetar, config?.enableTaf, config?.airports]);
 
-  return { weather, aviationWeather, loading, error };
+  return { weather, aviationWeather, loading, error, aviationError };
 }
