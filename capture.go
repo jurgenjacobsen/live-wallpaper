@@ -34,6 +34,7 @@ func captureWallpaper(ctx context.Context, pageURL, outputPath string, provider 
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.WindowSize(width, height),
 	)
+	opts = append(opts, platformAllocatorOptions()...)
 
 	allocCtx, allocCancel := chromedp.NewExecAllocator(ctx, opts...)
 	defer allocCancel()
