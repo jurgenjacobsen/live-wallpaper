@@ -64,7 +64,8 @@ jobs:
       - name: Package Windows Installer
         if: matrix.os == 'windows-latest'
         run: |
-          iscc /DMyAppVersion=${{ github.ref_name }} /DMySourceExe="build/bin/Live Wallpaper.exe" "installer/LiveWallpaper.iss"
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          iscc /DMyAppVersion="$version" /DMySourceExe="build/bin/Live Wallpaper.exe" "installer/LiveWallpaper.iss"
           mv installer/dist/LiveWallpaper-Setup-*.exe build/bin/LiveWallpaper-Setup-${{ github.ref_name }}.exe
 
       # Package macOS DMG
