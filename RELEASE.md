@@ -33,6 +33,17 @@ git tag v2.0.0
 git push origin v2.0.0
 ```
 
+**Note:** The GitHub Action will only run if the tag matches the pattern `v*` (e.g. `v2.0.0`, `v2.1.3`, etc.). If you push a tag that does not match this pattern, the workflow will not be triggered.
+
+> **Tip:** You can also undo/delete a tag if you accidentally pushed the wrong version:
+```bash
+# Delete the local tag
+git tag -d v2.0.0
+
+# Delete the remote tag
+git push --delete origin v2.0.0 
+```
+
 ---
 
 ## 2. GitHub Actions Matrix Builds
